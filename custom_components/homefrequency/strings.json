@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Home Frequency",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Home Frequency Discovered",
+        "description": "The HomeFrequency add-on was detected at {host}:{port}. Press submit to set up the integration."
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to Home Frequency at the given host and port."
+    },
+    "abort": {
+      "already_configured": "Home Frequency is already configured."
+    }
+  }
+}

@@ -2,4 +2,8 @@
 data/
 __pycache__/
 *.pyc
+*.db
+*.db-*
 .backups/
+.claude/
+.DS_Store

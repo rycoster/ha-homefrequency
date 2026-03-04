@@ -1,0 +1,20 @@
+name: HomeFrequency
+description: Recurring task tracker
+version: 2.1.0
+slug: homefrequency
+arch:
+  - amd64
+  - aarch64
+  - armv7
+  - armhf
+  - i386
+ingress: true
+ingress_port: 5050
+panel_icon: mdi:clipboard-check-outline
+panel_title: Home Frequency
+ports:
+  "5050/tcp": null
+map:
+  - config:rw
+  - data:rw
+  - share:rw
