@@ -692,6 +692,12 @@ body {
     opacity: 0.7;
 }
 
+.version-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-right: auto;
+}
+
 .data-btn {
     padding: 2px 8px;
     background: transparent;

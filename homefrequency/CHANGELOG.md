@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2
+- Fixed integration default hostname (`local-homefrequency`) for GitHub repo install
+- Added version label to bottom-left of UI
+
 ## 2.2.1
 - Visual feedback for edit mode (soft blue edge glow) and selected tasks (blue card glow)
 - Stronger glow in dark mode for visibility
