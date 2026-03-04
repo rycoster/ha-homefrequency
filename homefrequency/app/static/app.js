@@ -247,7 +247,7 @@ async function loadTasks(highlightId) {
         });
 
         card.querySelector('.task-name').addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded')) return;
+            if (!card.classList.contains('card-expanded') || !editMode) return;
             const nameEl = e.currentTarget;
             if (nameEl.querySelector('input')) return;
 
@@ -286,7 +286,7 @@ async function loadTasks(highlightId) {
 
         // Inline frequency editing
         card.querySelector('.task-meta').addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded')) return;
+            if (!card.classList.contains('card-expanded') || !editMode) return;
             const metaEl = e.currentTarget;
             if (metaEl.querySelector('input, select')) return;
             metaEl.style.cursor = 'default';
@@ -543,19 +543,19 @@ async function loadTasks(highlightId) {
                 notesDiv.classList.remove('open');
             } else if (hasNotes || hasHistory) {
                 notesDiv.classList.add('open');
-            } else if (card.classList.contains('card-expanded')) {
+            } else if (card.classList.contains('card-expanded') && editMode) {
                 openNotesEditor();
             }
         });
 
         notesDiv.addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded')) return;
+            if (!card.classList.contains('card-expanded') || !editMode) return;
             if (e.target.closest('.completion-history')) return;
             if (!notesDiv.querySelector('textarea')) openNotesEditor();
         });
 
         card.querySelector('.task-due').addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded')) return;
+            if (!card.classList.contains('card-expanded') || !editMode) return;
             const dueEl = e.currentTarget;
             if (dueEl.querySelector('input')) return;
 
