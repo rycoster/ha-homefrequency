@@ -33,7 +33,9 @@ def create_task():
 
     notes = data.get('notes', '').strip() or None
 
-    if schedule_type == 'fixed':
+    if schedule_type == 'dynamic':
+        task_id = add_task(name, frequency_days=0, schedule_type='dynamic', notes=notes)
+    elif schedule_type == 'fixed':
         fixed_unit = data.get('fixed_unit')
         fixed_value = data.get('fixed_value')
         if not fixed_unit or fixed_value is None:
@@ -56,6 +58,19 @@ def mark_complete(task_id):
     return jsonify({'ok': True})
 
 
+@app.route('/api/tasks/<int:task_id>/snooze', methods=['POST'])
+def snooze_task(task_id):
+    from models import _next_season_start
+    edit_task(task_id, snoozed_until=_next_season_start())
+    return jsonify({'ok': True})
+
+
+@app.route('/api/tasks/<int:task_id>/unsnooze', methods=['POST'])
+def unsnooze_task(task_id):
+    edit_task(task_id, snoozed_until='')
+    return jsonify({'ok': True})
+
+
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
 def remove_task(task_id):
     delete_task(task_id)
@@ -75,6 +90,7 @@ def export_tasks():
             'fixed_value': t.get('fixed_value'),
             'notes': t.get('notes'),
             'last_completed': t.get('last_completed'),
+            'snoozed_until': t.get('snoozed_until'),
         })
     return jsonify(export)
 

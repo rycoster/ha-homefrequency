@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import calendar
 
 DB_DIR = os.environ.get('DB_DIR', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data'))
@@ -35,6 +35,8 @@ def init_db():
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN fixed_value INTEGER")
     if 'notes' not in cols:
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN notes TEXT")
+    if 'snoozed_until' not in cols:
+        conn.execute("ALTER TABLE recurring_tasks ADD COLUMN snoozed_until TIMESTAMP")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS task_completions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,15 +49,79 @@ def init_db():
     conn.close()
 
 
+def _get_season(dt):
+    """Return season name from a datetime."""
+    m = dt.month
+    if m in (12, 1, 2):
+        return 'winter'
+    if m in (3, 4, 5):
+        return 'spring'
+    if m in (6, 7, 8):
+        return 'summer'
+    return 'fall'
+
+
+def _next_season_start():
+    """Return the start date of the next season as ISO timestamp."""
+    now = datetime.now()
+    m = now.month
+    y = now.year
+    # Season boundaries: Mar 1, Jun 1, Sep 1, Dec 1
+    if m < 3:
+        return datetime(y, 3, 1).isoformat()
+    if m < 6:
+        return datetime(y, 6, 1).isoformat()
+    if m < 9:
+        return datetime(y, 9, 1).isoformat()
+    if m < 12:
+        return datetime(y, 12, 1).isoformat()
+    return datetime(y + 1, 3, 1).isoformat()
+
+
+def _calc_dynamic_interval(completions):
+    """Calculate predicted interval from completion gaps grouped by season.
+
+    Returns (predicted_days, season_used) or (None, None) if < 2 completions.
+    """
+    if len(completions) < 2:
+        return None, None
+
+    # completions are sorted DESC (newest first)
+    gaps_by_season = {}
+    all_gaps = []
+    for i in range(len(completions) - 1):
+        later = datetime.fromisoformat(completions[i])
+        earlier = datetime.fromisoformat(completions[i + 1])
+        gap = (later - earlier).days
+        if gap <= 0:
+            continue
+        season = _get_season(later)
+        gaps_by_season.setdefault(season, []).append(gap)
+        all_gaps.append(gap)
+
+    if not all_gaps:
+        return None, None
+
+    current_season = _get_season(datetime.now())
+    if current_season in gaps_by_season:
+        gaps = gaps_by_season[current_season]
+        return round(sum(gaps) / len(gaps)), current_season
+
+    avg = round(sum(all_gaps) / len(all_gaps))
+    return avg, 'overall'
+
+
 def add_task(name, frequency_days=0, schedule_type='interval',
              fixed_unit=None, fixed_value=None, notes=None):
     conn = get_db()
+    # Dynamic tasks start with no implicit first completion
+    last_completed = None if schedule_type == 'dynamic' else datetime.now().isoformat()
     cur = conn.execute(
         '''INSERT INTO recurring_tasks
            (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed)
            VALUES (?, ?, ?, ?, ?, ?, ?)''',
         (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes,
-         datetime.now().isoformat())
+         last_completed)
     )
     task_id = cur.lastrowid
     conn.commit()
@@ -94,7 +160,7 @@ def delete_task(task_id):
 
 
 def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
-              fixed_unit=None, fixed_value=None, notes=None):
+              fixed_unit=None, fixed_value=None, notes=None, snoozed_until=None):
     conn = get_db()
     if name is not None:
         conn.execute('UPDATE recurring_tasks SET name = ? WHERE id = ?', (name, task_id))
@@ -108,6 +174,10 @@ def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
         conn.execute('UPDATE recurring_tasks SET fixed_value = ? WHERE id = ?', (fixed_value, task_id))
     if notes is not None:
         conn.execute('UPDATE recurring_tasks SET notes = ? WHERE id = ?', (notes, task_id))
+    if snoozed_until is not None:
+        # Pass empty string to clear snooze
+        val = snoozed_until if snoozed_until else None
+        conn.execute('UPDATE recurring_tasks SET snoozed_until = ? WHERE id = ?', (val, task_id))
     conn.commit()
     conn.close()
 
@@ -201,28 +271,75 @@ def get_all_tasks():
     for row in rows:
         task = dict(row)
         stype = task.get('schedule_type') or 'interval'
+        task['completions'] = get_completions(task['id'], conn)
 
-        if stype == 'fixed' and task.get('fixed_unit') and task.get('fixed_value') is not None:
+        # Check snooze state
+        is_snoozed = False
+        if task.get('snoozed_until'):
+            snooze_end = datetime.fromisoformat(task['snoozed_until'])
+            if now < snooze_end:
+                is_snoozed = True
+            else:
+                # Snooze expired, clear it
+                conn.execute('UPDATE recurring_tasks SET snoozed_until = NULL WHERE id = ?', (task['id'],))
+                task['snoozed_until'] = None
+
+        task['is_snoozed'] = is_snoozed
+
+        if stype == 'dynamic':
+            predicted, season = _calc_dynamic_interval(task['completions'])
+            task['dynamic'] = {
+                'predicted_days': predicted,
+                'season': season,
+            }
+
+            if predicted is None:
+                # Tracking mode: not enough data
+                task['next_due'] = None
+                task['days_until'] = None
+                task['is_overdue'] = False
+            else:
+                if task['last_completed']:
+                    last = datetime.fromisoformat(task['last_completed'])
+                    next_due = last + timedelta(days=predicted)
+                else:
+                    next_due = now
+                task['next_due'] = next_due.isoformat()
+                delta = next_due - now
+                task['days_until'] = delta.days
+                task['is_overdue'] = delta.days < 0
+
+        elif stype == 'fixed' and task.get('fixed_unit') and task.get('fixed_value') is not None:
             next_due = _next_fixed_due(task)
+            delta = next_due - now
+            task['next_due'] = next_due.isoformat()
+            task['days_until'] = delta.days
+            task['is_overdue'] = delta.days < 0
         else:
-            # Interval logic (unchanged)
+            # Interval logic
             freq = timedelta(days=task['frequency_days'])
             if task['last_completed']:
                 last = datetime.fromisoformat(task['last_completed'])
                 next_due = last + freq
             else:
                 next_due = datetime.fromisoformat(task['created_at'])
-
-        delta = next_due - now
-        days_until = delta.days
-
-        task['next_due'] = next_due.isoformat()
-        task['days_until'] = days_until
-        task['is_overdue'] = days_until < 0
-        task['completions'] = get_completions(task['id'], conn)
+            delta = next_due - now
+            task['next_due'] = next_due.isoformat()
+            task['days_until'] = delta.days
+            task['is_overdue'] = delta.days < 0
 
         tasks.append(task)
 
+    conn.commit()
     conn.close()
-    tasks.sort(key=lambda t: t['next_due'])
+
+    # Sort: snoozed tasks by snooze-until, tracking (days_until=None) at end, rest by next_due
+    def sort_key(t):
+        if t['is_snoozed']:
+            return (1, t.get('snoozed_until', ''))
+        if t['days_until'] is None:
+            return (2, t.get('name', ''))
+        return (0, t.get('next_due', ''))
+
+    tasks.sort(key=sort_key)
     return tasks
