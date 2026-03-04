@@ -4,7 +4,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import HomeFrequencyCoordinator
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "button"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:

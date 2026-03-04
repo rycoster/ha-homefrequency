@@ -31,3 +31,11 @@ class HomeFrequencyCoordinator(DataUpdateCoordinator):
                     return await resp.json()
         except Exception as err:
             raise UpdateFailed(f"Error fetching tasks: {err}") from err
+
+    async def async_complete_task(self, task_id: int) -> None:
+        """Mark a task as complete via the API."""
+        url = f"{self._url.rsplit('/api/tasks', 1)[0]}/api/tasks/{task_id}/complete"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                resp.raise_for_status()
+        await self.async_request_refresh()

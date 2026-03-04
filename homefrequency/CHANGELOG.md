@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.0
+- Dynamic frequency intervals (daily/weekly/monthly/yearly presets with custom option)
+- Snooze tasks (push due date forward by 1 day)
+- HA reset buttons — one button entity per task to mark complete from HA dashboards/automations
+- New sensor attributes: notes, snooze status
+
 ## 2.1.1
 - Tapping a task now shows Reset button directly; Delete only visible in Edit mode
 - Inline editing (name, frequency, due date, notes) locked unless Edit mode is active

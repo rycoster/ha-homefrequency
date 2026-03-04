@@ -479,6 +479,76 @@ body {
     color: var(--success);
 }
 
+.task-due.tracking {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.task-due.snoozed {
+    font-style: italic;
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.task-card.snoozed {
+    opacity: 0.45;
+    transition: opacity 0.3s;
+}
+
+.task-card.snoozed:hover {
+    opacity: 0.8;
+}
+
+.task-card.tracking {
+    opacity: 0.6;
+    transition: opacity 0.3s;
+}
+
+.task-card.tracking:hover {
+    opacity: 0.9;
+}
+
+.btn-snooze {
+    background: var(--warning) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    min-width: 28px;
+}
+
+.btn-snooze:hover {
+    opacity: 0.85;
+}
+
+.btn-unsnooze {
+    background: var(--hover-bg) !important;
+    color: var(--text-secondary) !important;
+    font-size: 11px !important;
+}
+
+.btn-unsnooze:hover {
+    color: var(--text-primary) !important;
+}
+
+.type-switch {
+    font-size: 10px !important;
+    color: var(--text-secondary) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    padding: 2px 2px !important;
+}
+
+.tag-dynamic {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    padding: 1px 5px;
+    border-radius: 3px;
+    line-height: 1;
+}
+
 .task-actions {
     display: flex;
     gap: 6px;

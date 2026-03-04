@@ -1,6 +1,6 @@
 name: HomeFrequency
 description: Recurring task tracker
-version: 2.1.1
+version: 2.2.0
 slug: homefrequency
 arch:
   - amd64
