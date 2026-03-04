@@ -706,6 +706,28 @@ body {
     color: var(--text-primary);
 }
 
+/* Edit mode — subtle page-level indicator */
+body.edit-mode {
+    box-shadow: inset 0 0 30px rgba(3, 169, 244, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    body.edit-mode {
+        box-shadow: inset 0 0 80px rgba(3, 169, 244, 0.25), inset 0 0 200px rgba(3, 169, 244, 0.08);
+    }
+}
+
+/* Selected card — subtle highlight */
+.task-card.card-expanded {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent), var(--shadow);
+}
+
+@media (prefers-color-scheme: dark) {
+    .task-card.card-expanded {
+        box-shadow: 0 0 12px rgba(3, 169, 244, 0.3), 0 0 0 1px rgba(3, 169, 244, 0.4), var(--shadow);
+    }
+}
+
 /* Edit mode gating — per-card expand on tap */
 .task-card:not(.card-expanded) .task-name {
     cursor: default;

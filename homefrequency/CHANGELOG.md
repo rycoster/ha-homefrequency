@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1
+- Visual feedback for edit mode (soft blue edge glow) and selected tasks (blue card glow)
+- Stronger glow in dark mode for visibility
+
 ## 2.2.0
 - Dynamic frequency intervals (daily/weekly/monthly/yearly presets with custom option)
 - Snooze tasks (push due date forward by 1 day)
