@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HomeFrequency</title>
+    <base href="{{ ingress_path }}/">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/style.css?v=2.3.0">
+</head>
+<body>
+    <script>const BASE_PATH = "{{ ingress_path }}";</script>
+    <div class="container">
+        <div class="top-bar">
+            <button id="add-task-toggle" class="add-task-toggle">+ New Task</button>
+            <button id="edit-mode-toggle" class="edit-mode-toggle">Edit</button>
+        </div>
+        <form id="add-task-form" class="add-task">
+            <div class="add-task-row">
+                <input type="text" id="task-name" placeholder="Task name" required>
+                <div class="schedule-toggle">
+                    <button type="button" class="toggle-btn" data-type="interval">Interval</button>
+                    <button type="button" class="toggle-btn" data-type="fixed">Fixed</button>
+                    <button type="button" class="toggle-btn active" data-type="dynamic">Dynamic</button>
+                </div>
+                <button type="button" id="toggle-notes" class="toggle-notes-btn" title="Add notes">&#128172;</button>
+                <button type="submit">Add</button>
+            </div>
+            <div id="interval-fields" class="freq-group" style="display:none;">
+                <input type="number" id="task-freq" placeholder="#" min="1" value="1">
+                <select id="task-unit">
+                    <option value="1">days</option>
+                    <option value="7">weeks</option>
+                    <option value="30">months</option>
+                    <option value="365">years</option>
+                </select>
+            </div>
+            <div id="fixed-fields" class="freq-group" style="display:none;">
+                <select id="fixed-unit">
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+                <select id="fixed-dow">
+                    <option value="0">Monday</option>
+                    <option value="1">Tuesday</option>
+                    <option value="2">Wednesday</option>
+                    <option value="3">Thursday</option>
+                    <option value="4">Friday</option>
+                    <option value="5">Saturday</option>
+                    <option value="6">Sunday</option>
+                </select>
+                <input type="number" id="fixed-dom" placeholder="Day" min="1" max="31" style="display:none;">
+                <div id="fixed-yearly-inputs" style="display:none;">
+                    <select id="fixed-month">
+                        <option value="1">Jan</option>
+                        <option value="2">Feb</option>
+                        <option value="3">Mar</option>
+                        <option value="4">Apr</option>
+                        <option value="5">May</option>
+                        <option value="6">Jun</option>
+                        <option value="7">Jul</option>
+                        <option value="8">Aug</option>
+                        <option value="9">Sep</option>
+                        <option value="10">Oct</option>
+                        <option value="11">Nov</option>
+                        <option value="12">Dec</option>
+                    </select>
+                    <input type="number" id="fixed-year-day" placeholder="Day" min="1" max="31">
+                </div>
+            </div>
+            <textarea id="task-notes" placeholder="Notes (optional)" rows="2" style="display:none;"></textarea>
+        </form>
+        <div id="task-list" class="task-list"></div>
+        <div class="data-tools">
+            <span class="version-label">v2.2.2</span>
+            <button id="btn-export" class="data-btn">Export</button>
+            <button id="btn-import" class="data-btn">Import</button>
+            <input type="file" id="import-file" accept=".json" style="display:none;">
+        </div>
+    </div>
+    <script src="static/app.js?v=2.3.0"></script>
+</body>
+</html>
