@@ -208,20 +208,21 @@ async function loadTasks(highlightId) {
             dueClass = 'due-soon';
         } else if (days <= 7) {
             dueText = `Due in ${days} day${days !== 1 ? 's' : ''}`;
-            dueClass = 'ok';
+            dueClass = (task.frequency_days && days / task.frequency_days <= 0.25) ? 'due-approaching' : 'ok';
         } else if (days < 30) {
             const weeks = Math.floor(days / 7);
             dueText = `Due in ${weeks} week${weeks !== 1 ? 's' : ''}`;
-            dueClass = 'ok';
+            dueClass = (task.frequency_days && days / task.frequency_days <= 0.25) ? 'due-approaching' : 'ok';
         } else {
             const months = Math.floor(days / 30);
             dueText = `Due in ${months} month${months !== 1 ? 's' : ''}`;
-            dueClass = 'ok';
+            dueClass = (task.frequency_days && days / task.frequency_days <= 0.25) ? 'due-approaching' : 'ok';
         }
 
         const freqLabel = formatTaskFrequency(task);
         const dynamicTag = isDynamic ? '<span class="tag-dynamic">dynamic</span>' : '';
 
+        if (dueClass === 'due-approaching') card.classList.add('due-approaching');
         if (days > 90) card.classList.add('distant');
 
         const hasNotes = task.notes && task.notes.trim();
@@ -265,9 +266,9 @@ async function loadTasks(highlightId) {
                 <div class="task-name">${escapeHtml(task.name)}</div>
                 <div class="task-meta-row">
                     <span class="task-meta">${freqLabel}</span>${dynamicTag}
-                    ${sensorIcon}
-                    ${indicatorHtml}
                     ${historyIndicatorHtml}
+                    ${indicatorHtml}
+                    ${sensorIcon}
                 </div>
                 ${notesHtml}
                 ${sensorHtml}

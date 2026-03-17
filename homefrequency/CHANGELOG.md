@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.4.1
+- Due-approaching gradient coloring — tasks within 25% of their cycle show yellow/warning text and border instead of green
+
 ## 2.4.0
 - Per-task HA sensor toggle — enable sensors only for tasks you care about (off by default)
 - Blue house icon indicator on tasks with sensors enabled

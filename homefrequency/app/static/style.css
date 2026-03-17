@@ -324,6 +324,10 @@ body {
     background: var(--card-due-soon-bg);
 }
 
+.task-card.due-approaching {
+    border-left-color: var(--warning);
+}
+
 .task-info {
     flex: 1;
     min-width: 0;
@@ -391,38 +395,39 @@ body {
     border-color: var(--primary);
 }
 
-.task-notes-indicator {
-    font-size: 13px;
-    color: var(--divider);
-    cursor: pointer;
-    line-height: 1;
-    user-select: none;
-    transition: color 0.2s;
-}
-
-.task-notes-indicator.has-notes {
-    color: var(--text-secondary);
-}
-
-.task-notes-indicator:hover {
-    color: var(--primary);
-}
-
+.task-notes-indicator,
 .task-history-indicator {
     font-size: 13px;
     color: var(--divider);
     cursor: pointer;
     line-height: 1;
     user-select: none;
-    transition: color 0.2s;
+    transition: color 0.2s, font-size 0.2s, padding 0.2s;
 }
 
+.task-notes-indicator.has-notes,
 .task-history-indicator.has-history {
     color: var(--text-secondary);
 }
 
+.task-notes-indicator:hover,
 .task-history-indicator:hover {
     color: var(--primary);
+}
+
+/* Bigger tappable icons when card is expanded */
+.task-card.card-expanded .task-notes-indicator,
+.task-card.card-expanded .task-history-indicator,
+.task-card.card-expanded .sensor-icon {
+    font-size: 20px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: var(--hover-bg);
+}
+
+.task-card.card-expanded .sensor-icon svg {
+    width: 20px;
+    height: 20px;
 }
 
 .task-history {
@@ -567,6 +572,10 @@ body.edit-mode .card-expanded .btn-history-delete {
 
 .task-due.ok {
     color: var(--success);
+}
+
+.task-due.due-approaching {
+    color: var(--warning);
 }
 
 .task-due.tracking {
@@ -876,10 +885,16 @@ body:not(.edit-mode) .task-card.card-expanded .task-notes {
     align-items: center;
     margin-left: 2px;
     opacity: 0.7;
+    transition: font-size 0.2s, padding 0.2s;
 }
 
 .sensor-icon svg {
     vertical-align: middle;
+}
+
+/* More gap between expanded icons */
+.task-card.card-expanded .task-meta-row {
+    gap: 4px;
 }
 
 /* Undo button - only in edit mode */
