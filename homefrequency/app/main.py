@@ -36,6 +36,7 @@ def create_task():
 
     if schedule_type == 'dynamic':
         task_id = add_task(name, frequency_days=0, schedule_type='dynamic', notes=notes)
+        complete_task(task_id)
     elif schedule_type == 'fixed':
         fixed_unit = data.get('fixed_unit')
         fixed_value = data.get('fixed_value')

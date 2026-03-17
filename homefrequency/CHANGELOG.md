@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.4.2
+- Dynamic tasks now auto-complete on creation — starts the cycle immediately instead of showing "Tracking..."
+
 ## 2.4.1
 - Due-approaching gradient coloring — tasks within 25% of their cycle show yellow/warning text and border instead of green
 
