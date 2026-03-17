@@ -35,6 +35,8 @@ async def async_setup_entry(
         new_entities = []
         for task in coordinator.data:
             task_id = task["id"]
+            if not task.get("sensor_enabled"):
+                continue
             if task_id not in known_ids:
                 known_ids.add(task_id)
                 new_entities.append(TaskSensor(coordinator, task))
@@ -88,8 +90,11 @@ class TaskSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Unavailable when the task has been deleted from the API."""
-        return super().available and self._task_data is not None
+        """Unavailable when the task has been deleted or sensor disabled."""
+        task = self._task_data
+        if task is None or not task.get("sensor_enabled"):
+            return False
+        return super().available
 
     @property
     def native_value(self) -> int | None:

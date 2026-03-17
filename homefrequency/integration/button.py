@@ -30,6 +30,8 @@ async def async_setup_entry(
         new_entities = []
         for task in coordinator.data:
             task_id = task["id"]
+            if not task.get("sensor_enabled"):
+                continue
             if task_id not in known_ids:
                 known_ids.add(task_id)
                 new_entities.append(TaskCompleteButton(coordinator, task))
@@ -80,7 +82,10 @@ class TaskCompleteButton(CoordinatorEntity, ButtonEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and self._task_data is not None
+        task = self._task_data
+        if task is None or not task.get("sensor_enabled"):
+            return False
+        return super().available
 
     async def async_press(self) -> None:
         await self.coordinator.async_complete_task(self._task_id)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.0
+- Per-task HA sensor toggle — enable sensors only for tasks you care about (off by default)
+- Blue house icon indicator on tasks with sensors enabled
+- Undo button in edit mode to remove accidental completions
+
 ## 2.3.0
 - Completion history editing — delete or date-correct entries in edit mode
 - Separate history indicator (clock icon) toggles independently from notes

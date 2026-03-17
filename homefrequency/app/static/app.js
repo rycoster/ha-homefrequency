@@ -227,6 +227,7 @@ async function loadTasks(highlightId) {
         const hasNotes = task.notes && task.notes.trim();
         const hasHistory = task.completions && task.completions.length > 0;
         const notesOpen = hasNotes && (days <= 7 || days < 0);
+        const sensorIcon = task.sensor_enabled ? '<span class="sensor-icon" title="HA sensor enabled"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#03a9f4" d="M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z"/></svg></span>' : '';
         const indicatorHtml = `<span class="task-notes-indicator${hasNotes ? ' has-notes' : ''}" title="${hasNotes ? 'View notes' : 'Add notes'}">&#128172;</span>`;
         const historyIndicatorHtml = `<span class="task-history-indicator${hasHistory ? ' has-history' : ''}" title="Completion history">&#128337;</span>`;
 
@@ -252,21 +253,31 @@ async function loadTasks(highlightId) {
 
         const notesHtml = `<div class="task-notes${notesOpen ? ' open' : ''}">${hasNotes ? escapeHtml(task.notes) : ''}</div>`;
 
+        const sensorHtml = `<div class="sensor-toggle-row">
+            <label class="sensor-toggle-label">
+                <input type="checkbox" class="sensor-toggle" ${task.sensor_enabled ? 'checked' : ''}>
+                <span>HA Sensor</span>
+            </label>
+        </div>`;
+
         card.innerHTML = `
             <div class="task-info">
                 <div class="task-name">${escapeHtml(task.name)}</div>
                 <div class="task-meta-row">
                     <span class="task-meta">${freqLabel}</span>${dynamicTag}
+                    ${sensorIcon}
                     ${indicatorHtml}
                     ${historyIndicatorHtml}
                 </div>
                 ${notesHtml}
+                ${sensorHtml}
                 ${historyHtml}
             </div>
             <div class="task-due ${dueClass}" title="Click to set when you last did this" data-id="${task.id}">${dueText}</div>
             <div class="task-actions">
                 ${isSnoozed ? `<button class="btn-unsnooze" onclick="unsnoozeTask(${task.id})">Wake</button>` : ''}
                 ${!isSnoozed && isDynamic && days !== null && days < 0 ? `<button class="btn-snooze" onclick="snoozeTask(${task.id})">?</button>` : ''}
+                ${hasHistory ? `<button class="btn-undo" onclick="undoLastCompletion(${task.completions[0].id})" title="Undo last completion">Undo</button>` : ''}
                 <button class="btn-done" onclick="completeTask(${task.id})">Reset</button>
                 <button class="btn-delete" onclick="deleteTask(${task.id}, this)">Delete</button>
             </div>
@@ -882,6 +893,17 @@ async function loadTasks(highlightId) {
             });
         });
 
+        const sensorToggle = card.querySelector('.sensor-toggle');
+        if (sensorToggle) {
+            sensorToggle.addEventListener('change', async () => {
+                await fetch(`${BASE}/api/tasks/${task.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sensor_enabled: sensorToggle.checked })
+                });
+            });
+        }
+
         taskList.appendChild(card);
 
         if (highlightId && task.id === highlightId) {
@@ -953,6 +975,11 @@ function formatFrequency(days) {
         return w === 1 ? 'week' : `${w} weeks`;
     }
     return days === 1 ? 'day' : `${days} days`;
+}
+
+async function undoLastCompletion(completionId) {
+    await fetch(`${BASE}/api/completions/${completionId}`, { method: 'DELETE' });
+    loadTasks();
 }
 
 async function completeTask(id) {

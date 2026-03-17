@@ -37,6 +37,8 @@ def init_db():
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN notes TEXT")
     if 'snoozed_until' not in cols:
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN snoozed_until TIMESTAMP")
+    if 'sensor_enabled' not in cols:
+        conn.execute("ALTER TABLE recurring_tasks ADD COLUMN sensor_enabled INTEGER DEFAULT 0")
     conn.execute('''
         CREATE TABLE IF NOT EXISTS task_completions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,16 +117,16 @@ def _calc_dynamic_interval(completions):
 
 
 def add_task(name, frequency_days=0, schedule_type='interval',
-             fixed_unit=None, fixed_value=None, notes=None):
+             fixed_unit=None, fixed_value=None, notes=None, sensor_enabled=False):
     conn = get_db()
     # Dynamic tasks start with no implicit first completion
     last_completed = None if schedule_type == 'dynamic' else datetime.now().isoformat()
     cur = conn.execute(
         '''INSERT INTO recurring_tasks
-           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed)
-           VALUES (?, ?, ?, ?, ?, ?, ?)''',
+           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed, sensor_enabled)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
         (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes,
-         last_completed)
+         last_completed, 1 if sensor_enabled else 0)
     )
     task_id = cur.lastrowid
     conn.commit()
@@ -201,7 +203,8 @@ def delete_task(task_id):
 
 
 def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
-              fixed_unit=None, fixed_value=None, notes=None, snoozed_until=None):
+              fixed_unit=None, fixed_value=None, notes=None, snoozed_until=None,
+              sensor_enabled=None):
     conn = get_db()
     if name is not None:
         conn.execute('UPDATE recurring_tasks SET name = ? WHERE id = ?', (name, task_id))
@@ -219,6 +222,9 @@ def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
         # Pass empty string to clear snooze
         val = snoozed_until if snoozed_until else None
         conn.execute('UPDATE recurring_tasks SET snoozed_until = ? WHERE id = ?', (val, task_id))
+    if sensor_enabled is not None:
+        conn.execute('UPDATE recurring_tasks SET sensor_enabled = ? WHERE id = ?',
+                     (1 if sensor_enabled else 0, task_id))
     conn.commit()
     conn.close()
 
@@ -311,6 +317,7 @@ def get_all_tasks():
 
     for row in rows:
         task = dict(row)
+        task['sensor_enabled'] = bool(task.get('sensor_enabled'))
         stype = task.get('schedule_type') or 'interval'
         task['completions'] = get_completions(task['id'], conn)
 

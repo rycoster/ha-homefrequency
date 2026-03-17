@@ -870,6 +870,65 @@ body:not(.edit-mode) .task-card.card-expanded .task-notes {
     cursor: default;
 }
 
+/* Sensor icon on task cards */
+.sensor-icon {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 2px;
+    opacity: 0.7;
+}
+
+.sensor-icon svg {
+    vertical-align: middle;
+}
+
+/* Undo button - only in edit mode */
+.btn-undo {
+    display: none;
+    background: var(--text-secondary);
+    color: var(--card-bg);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-undo:hover {
+    opacity: 0.8;
+}
+
+body.edit-mode .btn-undo {
+    display: inline-block;
+}
+
+/* Sensor toggle - only visible in edit mode on expanded cards */
+.sensor-toggle-row {
+    display: none;
+}
+
+body.edit-mode .task-card.card-expanded .sensor-toggle-row {
+    display: flex;
+    padding: 6px 0;
+}
+
+.sensor-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.sensor-toggle-label input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;

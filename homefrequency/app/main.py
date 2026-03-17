@@ -112,6 +112,7 @@ def export_tasks():
             'notes': t.get('notes'),
             'last_completed': t.get('last_completed'),
             'snoozed_until': t.get('snoozed_until'),
+            'sensor_enabled': t.get('sensor_enabled', False),
         })
     return jsonify(export)
 
@@ -133,6 +134,7 @@ def import_tasks():
             fixed_unit=t.get('fixed_unit'),
             fixed_value=t.get('fixed_value'),
             notes=t.get('notes'),
+            sensor_enabled=t.get('sensor_enabled', False),
         )
         if t.get('last_completed'):
             complete_task(task_id, completed_at=t['last_completed'])
@@ -145,6 +147,7 @@ def update_task(task_id):
     data = request.get_json()
     freq = data.get('frequency_days')
     notes = data.get('notes')
+    sensor_enabled = data.get('sensor_enabled')
     edit_task(
         task_id,
         name=data.get('name'),
@@ -152,7 +155,8 @@ def update_task(task_id):
         schedule_type=data.get('schedule_type'),
         fixed_unit=data.get('fixed_unit'),
         fixed_value=int(data['fixed_value']) if data.get('fixed_value') is not None else None,
-        notes=notes
+        notes=notes,
+        sensor_enabled=sensor_enabled
     )
     return jsonify({'ok': True})
 

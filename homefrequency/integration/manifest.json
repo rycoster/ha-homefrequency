@@ -5,5 +5,5 @@
   "config_flow": true,
   "documentation": "",
   "iot_class": "local_polling",
-  "version": "2.3.0"
+  "version": "2.4.0"
 }
