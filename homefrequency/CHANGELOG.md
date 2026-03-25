@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.3
+- Fix: tapping notes/history buttons no longer deselects the task card
+- Notes now render URLs as clickable hyperlinks (open in new tab)
+
 ## 2.4.2
 - Dynamic tasks now auto-complete on creation — starts the cycle immediately instead of showing "Tracking..."
 

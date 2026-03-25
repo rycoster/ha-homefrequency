@@ -511,6 +511,12 @@ body.edit-mode .card-expanded .btn-history-delete {
     margin-top: 6px;
 }
 
+.task-notes a {
+    color: var(--accent);
+    text-decoration: underline;
+    word-break: break-all;
+}
+
 .notes-edit {
     width: 100%;
     background: var(--input-bg);

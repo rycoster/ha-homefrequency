@@ -252,7 +252,7 @@ async function loadTasks(highlightId) {
             historyHtml = '<div class="task-history"></div>';
         }
 
-        const notesHtml = `<div class="task-notes${notesOpen ? ' open' : ''}">${hasNotes ? escapeHtml(task.notes) : ''}</div>`;
+        const notesHtml = `<div class="task-notes${notesOpen ? ' open' : ''}">${hasNotes ? linkifyText(escapeHtml(task.notes)) : ''}</div>`;
 
         const sensorHtml = `<div class="sensor-toggle-row">
             <label class="sensor-toggle-label">
@@ -286,7 +286,7 @@ async function loadTasks(highlightId) {
 
         card.addEventListener('click', (e) => {
             // Don't toggle expand when clicking buttons, inputs, or interactive elements
-            if (e.target.closest('button, input, select, textarea, .task-actions')) return;
+            if (e.target.closest('button, input, select, textarea, .task-actions, .task-notes-indicator, .task-history-indicator, .task-notes, .task-history')) return;
             toggleCardExpanded(card);
         });
 
@@ -755,6 +755,7 @@ async function loadTasks(highlightId) {
         });
 
         notesDiv.addEventListener('click', (e) => {
+            if (e.target.closest('a')) return;
             if (!card.classList.contains('card-expanded') || !editMode) return;
             if (!notesDiv.querySelector('textarea')) openNotesEditor();
         });
@@ -1030,6 +1031,10 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function linkifyText(escapedHtml) {
+    return escapedHtml.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
 // Export/Import
