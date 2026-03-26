@@ -1,10 +1,15 @@
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.components.persistent_notification import (
+    async_create as pn_create,
+    async_dismiss as pn_dismiss,
+)
 
 from .const import DOMAIN
 from .coordinator import HomeFrequencyCoordinator
 
 PLATFORMS = ["sensor", "button"]
+NOTIFICATION_ID = "homefrequency_overdue"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -32,6 +37,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    @callback
+    def _check_overdue() -> None:
+        if not coordinator.data:
+            return
+        overdue = [
+            task for task in coordinator.data
+            if task.get("is_overdue") and not task.get("is_snoozed")
+        ]
+        if overdue:
+            names = "\n".join(f"- {t['name']}" for t in overdue)
+            pn_create(
+                hass,
+                title=f"HomeFrequency: {len(overdue)} overdue task{'s' if len(overdue) != 1 else ''}",
+                message=names,
+                notification_id=NOTIFICATION_ID,
+            )
+        else:
+            pn_dismiss(hass, NOTIFICATION_ID)
+
+    entry.async_on_unload(coordinator.async_add_listener(_check_overdue))
+    _check_overdue()
+
     return True
 
 

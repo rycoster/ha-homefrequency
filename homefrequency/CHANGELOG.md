@@ -1,7 +1,10 @@
 # Changelog
 
+## 2.5.1
+- Overdue tasks now trigger a persistent notification in HA — shows count and task names, auto-dismisses when all caught up
+
 ## 2.5.0
-- New "Overdue Tasks" sensor — counts overdue (non-snoozed) tasks, usable as a HA sidebar badge or in automations
+- New "Overdue Tasks" sensor — counts overdue (non-snoozed) tasks, usable in automations
 
 ## 2.4.3
 - Fix: tapping notes/history buttons no longer deselects the task card
