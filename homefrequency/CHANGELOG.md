@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.5.0
+- New "Overdue Tasks" sensor — counts overdue (non-snoozed) tasks, usable as a HA sidebar badge or in automations
+
 ## 2.4.3
 - Fix: tapping notes/history buttons no longer deselects the task card
 - Notes now render URLs as clickable hyperlinks (open in new tab)

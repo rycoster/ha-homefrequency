@@ -43,6 +43,9 @@ async def async_setup_entry(
         if new_entities:
             async_add_entities(new_entities)
 
+    # Add the overdue count sensor (always present, exactly once).
+    async_add_entities([OverdueCountSensor(coordinator)])
+
     # Add sensors for tasks already present at startup.
     _async_add_new_tasks()
 
@@ -120,3 +123,36 @@ class TaskSensor(CoordinatorEntity, SensorEntity):
             "dynamic_predicted_days": dynamic.get("predicted_days"),
             "dynamic_season": dynamic.get("season"),
         }
+
+
+class OverdueCountSensor(CoordinatorEntity, SensorEntity):
+    """Sensor that reports the number of overdue tasks."""
+
+    _attr_icon = "mdi:alert-circle-outline"
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = "tasks"
+
+    def __init__(self, coordinator: HomeFrequencyCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = "hf_overdue_count"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, "homefrequency")},
+            name="Home Frequency",
+            manufacturer="HomeFrequency",
+        )
+
+    @property
+    def name(self) -> str:
+        return "Overdue Tasks"
+
+    @property
+    def native_value(self) -> int:
+        if not self.coordinator.data:
+            return 0
+        return sum(
+            1 for task in self.coordinator.data
+            if task.get("is_overdue") and not task.get("is_snoozed")
+        )
