@@ -285,8 +285,11 @@ async function loadTasks(highlightId) {
         `;
 
         card.addEventListener('click', (e) => {
-            // Don't toggle expand when clicking buttons, inputs, or interactive elements
-            if (e.target.closest('button, input, select, textarea, .task-actions, .task-notes-indicator, .task-history-indicator, .task-notes, .task-history')) return;
+            // Don't toggle when clicking buttons or inputs
+            if (e.target.closest('button, input, select, textarea, .task-actions')) return;
+            // When already expanded, also protect interactive content areas
+            if (card.classList.contains('card-expanded') &&
+                e.target.closest('.task-notes-indicator, .task-history-indicator, .task-notes, .task-history')) return;
             toggleCardExpanded(card);
         });
 

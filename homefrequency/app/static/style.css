@@ -831,11 +831,13 @@ body.edit-mode {
 /* Selected card — subtle highlight */
 .task-card.card-expanded {
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent), var(--shadow);
+    background: color-mix(in srgb, var(--primary) 5%, var(--card-bg));
 }
 
 @media (prefers-color-scheme: dark) {
     .task-card.card-expanded {
         box-shadow: 0 0 12px rgba(3, 169, 244, 0.3), 0 0 0 1px rgba(3, 169, 244, 0.4), var(--shadow);
+        background: color-mix(in srgb, var(--primary) 8%, var(--card-bg));
     }
 }
 

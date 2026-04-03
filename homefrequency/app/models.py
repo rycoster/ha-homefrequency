@@ -263,19 +263,30 @@ def _next_fixed_due(task):
         max_day = calendar.monthrange(year, month)[1]
         day = min(val, max_day)
         candidate = now.date().replace(day=day)
-        # If today is past the target day, or completed this month on/after target
+
+        def _push_next_month():
+            nonlocal candidate, month, year
+            month += 1
+            if month > 12:
+                month, year = 1, year + 1
+            md = calendar.monthrange(year, month)[1]
+            candidate = candidate.replace(year=year, month=month, day=min(val, md))
+
         if now.date() > candidate:
-            month += 1
-            if month > 12:
-                month, year = 1, year + 1
-            max_day = calendar.monthrange(year, month)[1]
-            candidate = candidate.replace(year=year, month=month, day=min(val, max_day))
-        elif now.date() == candidate and last and last.date() >= candidate:
-            month += 1
-            if month > 12:
-                month, year = 1, year + 1
-            max_day = calendar.monthrange(year, month)[1]
-            candidate = candidate.replace(year=year, month=month, day=min(val, max_day))
+            _push_next_month()
+        elif last:
+            # Check if already completed in the current cycle.
+            # The cycle runs from the previous month's target day to this month's.
+            # If completed on/after the previous target day, this cycle is done.
+            prev_m = month - 1
+            prev_y = year
+            if prev_m < 1:
+                prev_m, prev_y = 12, year - 1
+            prev_max = calendar.monthrange(prev_y, prev_m)[1]
+            cycle_start = now.date().replace(year=prev_y, month=prev_m,
+                                             day=min(val, prev_max))
+            if last.date() >= cycle_start:
+                _push_next_month()
         return datetime(candidate.year, candidate.month, candidate.day)
 
     elif unit == 'yearly':
@@ -288,20 +299,27 @@ def _next_fixed_due(task):
         except ValueError:
             max_day = calendar.monthrange(year, target_month)[1]
             candidate = now.date().replace(month=target_month, day=min(target_day, max_day))
+
+        def _push_next_year():
+            nonlocal candidate, year
+            year += 1
+            try:
+                candidate = candidate.replace(year=year)
+            except ValueError:
+                md = calendar.monthrange(year, target_month)[1]
+                candidate = candidate.replace(year=year, day=min(target_day, md))
+
         if now.date() > candidate:
-            year += 1
+            _push_next_year()
+        elif last:
+            # If completed after last year's target date, this cycle is done
             try:
-                candidate = candidate.replace(year=year)
+                prev_candidate = candidate.replace(year=year - 1)
             except ValueError:
-                max_day = calendar.monthrange(year, target_month)[1]
-                candidate = candidate.replace(year=year, day=min(target_day, max_day))
-        elif now.date() == candidate and last and last.date() >= candidate:
-            year += 1
-            try:
-                candidate = candidate.replace(year=year)
-            except ValueError:
-                max_day = calendar.monthrange(year, target_month)[1]
-                candidate = candidate.replace(year=year, day=min(target_day, max_day))
+                md = calendar.monthrange(year - 1, target_month)[1]
+                prev_candidate = candidate.replace(year=year - 1, day=min(target_day, md))
+            if last.date() >= prev_candidate:
+                _push_next_year()
         return datetime(candidate.year, candidate.month, candidate.day)
 
     return now

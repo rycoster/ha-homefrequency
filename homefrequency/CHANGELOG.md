@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.2
+- Fix: monthly/yearly fixed-schedule tasks no longer show due prematurely when completed early in the cycle
+- Fix: tapping anywhere on a collapsed card (including auto-expanded notes) now selects it
+- Selected card now has a subtle background tint for better visibility
+
 ## 2.5.1
 - Overdue tasks now trigger a persistent notification in HA — shows count and task names, auto-dismisses when all caught up
 
