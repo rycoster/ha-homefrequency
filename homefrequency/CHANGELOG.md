@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.5.3
+- Added README with project overview, installation guide, and feature documentation
+
 ## 2.5.2
 - Fix: monthly/yearly fixed-schedule tasks no longer show due prematurely when completed early in the cycle
 - Fix: tapping anywhere on a collapsed card (including auto-expanded notes) now selects it
