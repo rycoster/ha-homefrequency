@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.5.4
+## 2.5.3
 - Added README with project overview, installation guide, and feature documentation
 
 ## 2.5.2
