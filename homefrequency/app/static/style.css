@@ -634,6 +634,39 @@ body.edit-mode .card-expanded .btn-history-delete {
     color: var(--text-primary) !important;
 }
 
+.snooze-menu {
+    position: absolute;
+    right: 0;
+    margin-top: 4px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #ccc);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    min-width: 110px;
+    overflow: hidden;
+}
+
+.snooze-menu button {
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.snooze-menu button:hover {
+    background: var(--hover-bg);
+}
+
+.task-actions {
+    position: relative;
+}
+
 .type-switch {
     font-size: 10px !important;
     color: var(--text-secondary) !important;

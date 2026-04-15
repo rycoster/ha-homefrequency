@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.4
+- Snooze: any overdue task (interval, fixed, or dynamic) can now be snoozed from a duration picker (1 day / 3 days / 1 week / 2 weeks / 1 month)
+- Dynamic tracking-mode tasks also get the snooze button — lets you re-estimate when the task will next come due
+- New dynamic tasks auto-snooze for 7 days on creation so they place inline in the list instead of stacking at the bottom
+- Snoozed tasks now sort inline by their snooze-until date (as if it were a due date), so they work their way up the list naturally
+- Replaces the dynamic-only "?" snooze button that snoozed until next season
+
 ## 2.5.3
 - Added README with project overview, installation guide, and feature documentation
 

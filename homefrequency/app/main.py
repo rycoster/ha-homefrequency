@@ -62,9 +62,18 @@ def mark_complete(task_id):
 
 @app.route('/api/tasks/<int:task_id>/snooze', methods=['POST'])
 def snooze_task(task_id):
-    from models import _next_season_start
-    edit_task(task_id, snoozed_until=_next_season_start())
-    return jsonify({'ok': True})
+    from datetime import datetime, timedelta
+    data = request.get_json(silent=True) or {}
+    days = data.get('days')
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'days (int) required'}), 400
+    if days <= 0:
+        return jsonify({'error': 'days must be positive'}), 400
+    until = (datetime.now() + timedelta(days=days)).isoformat()
+    edit_task(task_id, snoozed_until=until)
+    return jsonify({'ok': True, 'snoozed_until': until})
 
 
 @app.route('/api/tasks/<int:task_id>/unsnooze', methods=['POST'])

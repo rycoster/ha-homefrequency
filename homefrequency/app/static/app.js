@@ -50,9 +50,49 @@ toggleBtns.forEach(btn => {
     });
 });
 
-async function snoozeTask(id) {
-    await fetch(`${BASE}/api/tasks/${id}/snooze`, { method: 'POST' });
+const SNOOZE_OPTIONS = [
+    { days: 1, label: '1 day' },
+    { days: 3, label: '3 days' },
+    { days: 7, label: '1 week' },
+    { days: 14, label: '2 weeks' },
+    { days: 30, label: '1 month' },
+];
+
+async function snoozeTask(id, days) {
+    await fetch(`${BASE}/api/tasks/${id}/snooze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days }),
+    });
     loadTasks(id);
+}
+
+function closeSnoozeMenu() {
+    document.querySelectorAll('.snooze-menu').forEach(el => el.remove());
+    document.removeEventListener('click', onDocClickCloseSnooze, true);
+}
+
+function onDocClickCloseSnooze(e) {
+    if (!e.target.closest('.snooze-menu') && !e.target.closest('.btn-snooze')) {
+        closeSnoozeMenu();
+    }
+}
+
+function openSnoozeMenu(btn, id) {
+    closeSnoozeMenu();
+    const menu = document.createElement('div');
+    menu.className = 'snooze-menu';
+    menu.innerHTML = SNOOZE_OPTIONS.map(o =>
+        `<button type="button" data-days="${o.days}">${o.label}</button>`
+    ).join('');
+    menu.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-days]');
+        if (!b) return;
+        snoozeTask(id, parseInt(b.dataset.days));
+        closeSnoozeMenu();
+    });
+    btn.parentElement.appendChild(menu);
+    setTimeout(() => document.addEventListener('click', onDocClickCloseSnooze, true), 0);
 }
 
 async function unsnoozeTask(id) {
@@ -277,7 +317,7 @@ async function loadTasks(highlightId) {
             <div class="task-due ${dueClass}" title="Click to set when you last did this" data-id="${task.id}">${dueText}</div>
             <div class="task-actions">
                 ${isSnoozed ? `<button class="btn-unsnooze" onclick="unsnoozeTask(${task.id})">Wake</button>` : ''}
-                ${!isSnoozed && isDynamic && days !== null && days < 0 ? `<button class="btn-snooze" onclick="snoozeTask(${task.id})">?</button>` : ''}
+                ${!isSnoozed && (days === null || days < 0) ? `<button class="btn-snooze" onclick="openSnoozeMenu(this, ${task.id})" title="Snooze">Zzz</button>` : ''}
                 ${hasHistory ? `<button class="btn-undo" onclick="undoLastCompletion(${task.completions[0].id})" title="Undo last completion">Undo</button>` : ''}
                 <button class="btn-done" onclick="completeTask(${task.id})">Reset</button>
                 <button class="btn-delete" onclick="deleteTask(${task.id}, this)">Delete</button>

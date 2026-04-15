@@ -121,12 +121,15 @@ def add_task(name, frequency_days=0, schedule_type='interval',
     conn = get_db()
     # Dynamic tasks start with no implicit first completion
     last_completed = None if schedule_type == 'dynamic' else datetime.now().isoformat()
+    # Dynamic tasks get a default 7-day snooze so they place inline in the list
+    # instead of piling up at the bottom while tracking
+    snoozed_until = (datetime.now() + timedelta(days=7)).isoformat() if schedule_type == 'dynamic' else None
     cur = conn.execute(
         '''INSERT INTO recurring_tasks
-           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed, sensor_enabled)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed, sensor_enabled, snoozed_until)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes,
-         last_completed, 1 if sensor_enabled else 0)
+         last_completed, 1 if sensor_enabled else 0, snoozed_until)
     )
     task_id = cur.lastrowid
     conn.commit()
@@ -399,10 +402,11 @@ def get_all_tasks():
     conn.commit()
     conn.close()
 
-    # Sort: snoozed tasks by snooze-until, tracking (days_until=None) at end, rest by next_due
+    # Sort: snoozed tasks sort inline by snoozed_until (treated as a due date),
+    # non-snoozed tracking tasks (no prediction yet) go to the end.
     def sort_key(t):
         if t['is_snoozed']:
-            return (1, t.get('snoozed_until', ''))
+            return (0, t.get('snoozed_until', ''))
         if t['days_until'] is None:
             return (2, t.get('name', ''))
         return (0, t.get('next_due', ''))
