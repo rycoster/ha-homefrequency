@@ -1,6 +1,6 @@
 name: HomeFrequency
 description: Recurring task tracker
-version: 2.5.4
+version: 2.5.5
 slug: homefrequency
 arch:
   - amd64
@@ -12,6 +12,7 @@ ingress: true
 ingress_port: 5050
 panel_icon: mdi:clipboard-check-outline
 panel_title: Home Frequency
+panel_admin: false
 ports:
   "5050/tcp": null
 map:

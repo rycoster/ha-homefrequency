@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.5.5
+- Sidebar panel is now visible to non-admin Home Assistant users (set `panel_admin: false`)
+
 ## 2.5.4
 - Snooze: any overdue task (interval, fixed, or dynamic) can now be snoozed from a duration picker (1 day / 3 days / 1 week / 2 weeks / 1 month)
 - Dynamic tracking-mode tasks also get the snooze button — lets you re-estimate when the task will next come due
