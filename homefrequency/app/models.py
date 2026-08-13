@@ -249,86 +249,86 @@ def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
 
 
 def _next_fixed_due(task):
-    """Calculate next due date for a fixed-schedule task."""
+    """Calculate the due date for a fixed-schedule task.
+
+    The due date is anchored to the schedule, not to today: a missed
+    occurrence stays due (overdue) until the task is completed. A completion
+    counts for the occurrence nearest to it -- completing a few days late
+    settles the missed date, completing a few days early settles the upcoming
+    one -- and the due date then advances to the following occurrence.
+    """
     now = datetime.now()
     unit = task['fixed_unit']
     val = task['fixed_value']
     last = _parse_ts(task['last_completed'])
 
+    def _to_dt(d):
+        return datetime(d.year, d.month, d.day)
+
+    def _nearest(prev_occ, next_occ, completed):
+        if (completed - prev_occ) <= (next_occ - completed):
+            return prev_occ
+        return next_occ
+
     if unit == 'weekly':
         # val = day of week (0=Mon..6=Sun)
-        days_ahead = (val - now.weekday()) % 7
-        candidate = now.date() + timedelta(days=days_ahead)
-        # The cycle runs from the previous target day to this one; if completed
-        # in that window the cycle is done, push a week (mirrors monthly/yearly).
-        if last and last.date() >= candidate - timedelta(days=7):
-            candidate += timedelta(days=7)
-        return datetime(candidate.year, candidate.month, candidate.day)
+        def occ_on_or_after(d):
+            return d + timedelta(days=(val - d.weekday()) % 7)
+
+        if not last:
+            return _to_dt(occ_on_or_after(now.date()))
+        ld = last.date()
+        t_next = occ_on_or_after(ld)
+        covered = _nearest(t_next - timedelta(days=7), t_next, ld)
+        return _to_dt(covered + timedelta(days=7))
 
     elif unit == 'monthly':
-        # val = day of month (1-31)
-        year, month = now.year, now.month
-        max_day = calendar.monthrange(year, month)[1]
-        day = min(val, max_day)
-        candidate = now.date().replace(day=day)
+        # val = day of month (1-31, clamped to the month's length)
+        def occ(y, m):
+            return date(y, m, min(val, calendar.monthrange(y, m)[1]))
 
-        def _push_next_month():
-            nonlocal candidate, month, year
-            month += 1
-            if month > 12:
-                month, year = 1, year + 1
-            md = calendar.monthrange(year, month)[1]
-            candidate = candidate.replace(year=year, month=month, day=min(val, md))
+        def next_month(y, m):
+            return (y + 1, 1) if m == 12 else (y, m + 1)
 
-        if now.date() > candidate:
-            _push_next_month()
-        elif last:
-            # Check if already completed in the current cycle.
-            # The cycle runs from the previous month's target day to this month's.
-            # If completed on/after the previous target day, this cycle is done.
-            prev_m = month - 1
-            prev_y = year
-            if prev_m < 1:
-                prev_m, prev_y = 12, year - 1
-            prev_max = calendar.monthrange(prev_y, prev_m)[1]
-            cycle_start = now.date().replace(year=prev_y, month=prev_m,
-                                             day=min(val, prev_max))
-            if last.date() >= cycle_start:
-                _push_next_month()
-        return datetime(candidate.year, candidate.month, candidate.day)
+        def prev_month(y, m):
+            return (y - 1, 12) if m == 1 else (y, m - 1)
+
+        if not last:
+            candidate = occ(now.year, now.month)
+            if candidate < now.date():
+                candidate = occ(*next_month(now.year, now.month))
+            return _to_dt(candidate)
+        ld = last.date()
+        t = occ(ld.year, ld.month)
+        if t >= ld:
+            t_prev, t_next = occ(*prev_month(ld.year, ld.month)), t
+        else:
+            t_prev, t_next = t, occ(*next_month(ld.year, ld.month))
+        covered = _nearest(t_prev, t_next, ld)
+        return _to_dt(occ(*next_month(covered.year, covered.month)))
 
     elif unit == 'yearly':
         # val = MMDD int (e.g. 315 = March 15, 1225 = December 25)
         target_month = val // 100
         target_day = val % 100
-        year = now.year
-        try:
-            candidate = now.date().replace(month=target_month, day=target_day)
-        except ValueError:
-            max_day = calendar.monthrange(year, target_month)[1]
-            candidate = now.date().replace(month=target_month, day=min(target_day, max_day))
 
-        def _push_next_year():
-            nonlocal candidate, year
-            year += 1
-            try:
-                candidate = candidate.replace(year=year)
-            except ValueError:
-                md = calendar.monthrange(year, target_month)[1]
-                candidate = candidate.replace(year=year, day=min(target_day, md))
+        def occ(y):
+            return date(y, target_month,
+                        min(target_day, calendar.monthrange(y, target_month)[1]))
 
-        if now.date() > candidate:
-            _push_next_year()
-        elif last:
-            # If completed after last year's target date, this cycle is done
-            try:
-                prev_candidate = candidate.replace(year=year - 1)
-            except ValueError:
-                md = calendar.monthrange(year - 1, target_month)[1]
-                prev_candidate = candidate.replace(year=year - 1, day=min(target_day, md))
-            if last.date() >= prev_candidate:
-                _push_next_year()
-        return datetime(candidate.year, candidate.month, candidate.day)
+        if not last:
+            candidate = occ(now.year)
+            if candidate < now.date():
+                candidate = occ(now.year + 1)
+            return _to_dt(candidate)
+        ld = last.date()
+        t = occ(ld.year)
+        if t >= ld:
+            t_prev, t_next = occ(ld.year - 1), t
+        else:
+            t_prev, t_next = t, occ(ld.year + 1)
+        covered = _nearest(t_prev, t_next, ld)
+        return _to_dt(occ(covered.year + 1))
 
     return now
 
