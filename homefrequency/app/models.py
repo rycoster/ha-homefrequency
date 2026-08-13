@@ -51,6 +51,20 @@ def init_db():
     conn.close()
 
 
+def _parse_ts(value):
+    """Parse an ISO timestamp, returning None for missing or malformed values.
+
+    Timestamps written before API validation existed may be malformed; a bad
+    row must not take down the whole task list.
+    """
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _get_season(dt):
     """Return season name from a datetime."""
     m = dt.month
@@ -95,8 +109,10 @@ def _calc_dynamic_interval(completions):
     for i in range(len(completions) - 1):
         c_later = completions[i]
         c_earlier = completions[i + 1]
-        later = datetime.fromisoformat(c_later['completed_at'] if isinstance(c_later, dict) else c_later)
-        earlier = datetime.fromisoformat(c_earlier['completed_at'] if isinstance(c_earlier, dict) else c_earlier)
+        later = _parse_ts(c_later['completed_at'] if isinstance(c_later, dict) else c_later)
+        earlier = _parse_ts(c_earlier['completed_at'] if isinstance(c_earlier, dict) else c_earlier)
+        if later is None or earlier is None:
+            continue
         gap = (later - earlier).days
         if gap <= 0:
             continue
@@ -237,27 +253,16 @@ def _next_fixed_due(task):
     now = datetime.now()
     unit = task['fixed_unit']
     val = task['fixed_value']
-    last = datetime.fromisoformat(task['last_completed']) if task['last_completed'] else None
+    last = _parse_ts(task['last_completed'])
 
     if unit == 'weekly':
         # val = day of week (0=Mon..6=Sun)
-        today_dow = now.weekday()
-        days_ahead = (val - today_dow) % 7
-        candidate = now.date() + timedelta(days=days_ahead if days_ahead > 0 else 7)
-        # If completed this week on/after the target day, push to next week
-        if last and days_ahead == 0:
-            candidate = now.date() + timedelta(days=7)
-        if last:
-            last_date = last.date()
-            # Same week check: if last completed is within this cycle
-            last_days_since = (last_date.weekday() - val) % 7
-            if last_days_since == 0 and last_date == now.date():
-                # Completed today on the target day -- next week
-                candidate = now.date() + timedelta(days=7)
-            elif days_ahead == 0 and last_date >= (now.date() - timedelta(days=6)):
-                # Today is the target day and was completed recently this cycle
-                if last_date >= now.date() - timedelta(days=(now.weekday() - val) % 7):
-                    candidate = now.date() + timedelta(days=7)
+        days_ahead = (val - now.weekday()) % 7
+        candidate = now.date() + timedelta(days=days_ahead)
+        # The cycle runs from the previous target day to this one; if completed
+        # in that window the cycle is done, push a week (mirrors monthly/yearly).
+        if last and last.date() >= candidate - timedelta(days=7):
+            candidate += timedelta(days=7)
         return datetime(candidate.year, candidate.month, candidate.day)
 
     elif unit == 'monthly':
@@ -345,11 +350,11 @@ def get_all_tasks():
         # Check snooze state
         is_snoozed = False
         if task.get('snoozed_until'):
-            snooze_end = datetime.fromisoformat(task['snoozed_until'])
-            if now < snooze_end:
+            snooze_end = _parse_ts(task['snoozed_until'])
+            if snooze_end and now < snooze_end:
                 is_snoozed = True
             else:
-                # Snooze expired, clear it
+                # Snooze expired (or timestamp malformed), clear it
                 conn.execute('UPDATE recurring_tasks SET snoozed_until = NULL WHERE id = ?', (task['id'],))
                 task['snoozed_until'] = None
 
@@ -368,8 +373,8 @@ def get_all_tasks():
                 task['days_until'] = None
                 task['is_overdue'] = False
             else:
-                if task['last_completed']:
-                    last = datetime.fromisoformat(task['last_completed'])
+                last = _parse_ts(task['last_completed'])
+                if last:
                     next_due = last + timedelta(days=predicted)
                 else:
                     next_due = now
@@ -387,11 +392,11 @@ def get_all_tasks():
         else:
             # Interval logic
             freq = timedelta(days=task['frequency_days'])
-            if task['last_completed']:
-                last = datetime.fromisoformat(task['last_completed'])
+            last = _parse_ts(task['last_completed'])
+            if last:
                 next_due = last + freq
             else:
-                next_due = datetime.fromisoformat(task['created_at'])
+                next_due = _parse_ts(task['created_at']) or now
             delta = next_due - now
             task['next_due'] = next_due.isoformat()
             task['days_until'] = delta.days

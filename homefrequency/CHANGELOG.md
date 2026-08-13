@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.6
+- Fix: weekly fixed-schedule tasks now show as due (and go overdue) on their target day — previously they skipped straight to the following week and could never be overdue
+- Fix: timestamps are now validated on the API (complete, edit completion, import return 400 on bad dates), and malformed timestamps already in the database no longer break the task list
+- Export now includes full completion history; import restores it along with snooze state, so dynamic tasks keep their learned cadence after a backup/restore
+
 ## 2.5.5
 - Sidebar panel is now visible to non-admin Home Assistant users (set `panel_admin: false`)
 

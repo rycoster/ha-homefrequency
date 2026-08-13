@@ -1,9 +1,19 @@
 import os
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from models import (init_db, add_task, complete_task, delete_task, edit_task,
                      get_all_tasks, delete_completion, edit_completion)
 
 app = Flask(__name__)
+
+
+def _valid_iso(value):
+    """Return True if value is a parseable ISO timestamp string."""
+    try:
+        datetime.fromisoformat(value)
+        return True
+    except (TypeError, ValueError):
+        return False
 
 
 @app.after_request
@@ -56,13 +66,15 @@ def create_task():
 @app.route('/api/tasks/<int:task_id>/complete', methods=['POST'])
 def mark_complete(task_id):
     data = request.get_json(silent=True) or {}
-    complete_task(task_id, completed_at=data.get('completed_at'))
+    completed_at = data.get('completed_at')
+    if completed_at is not None and not _valid_iso(completed_at):
+        return jsonify({'error': 'completed_at must be an ISO timestamp'}), 400
+    complete_task(task_id, completed_at=completed_at)
     return jsonify({'ok': True})
 
 
 @app.route('/api/tasks/<int:task_id>/snooze', methods=['POST'])
 def snooze_task(task_id):
-    from datetime import datetime, timedelta
     data = request.get_json(silent=True) or {}
     days = data.get('days')
     try:
@@ -96,6 +108,8 @@ def update_completion(completion_id):
     new_date = data.get('completed_at')
     if not new_date:
         return jsonify({'error': 'completed_at is required'}), 400
+    if not _valid_iso(new_date):
+        return jsonify({'error': 'completed_at must be an ISO timestamp'}), 400
     task_id = edit_completion(completion_id, new_date)
     if task_id is None:
         return jsonify({'error': 'Completion not found'}), 404
@@ -123,6 +137,7 @@ def export_tasks():
             'last_completed': t.get('last_completed'),
             'snoozed_until': t.get('snoozed_until'),
             'sensor_enabled': t.get('sensor_enabled', False),
+            'completions': [c['completed_at'] for c in t.get('completions', [])],
         })
     return jsonify(export)
 
@@ -132,22 +147,47 @@ def import_tasks():
     data = request.get_json()
     if not isinstance(data, list):
         return jsonify({'error': 'Expected a JSON array of tasks'}), 400
-    count = 0
+
+    # Validate everything before touching the database, so a bad backup
+    # is rejected whole instead of half-imported.
+    entries = []
     for t in data:
-        name = t.get('name', '').strip()
+        if not isinstance(t, dict):
+            return jsonify({'error': 'Each task must be a JSON object'}), 400
+        name = (t.get('name') or '').strip()
         if not name:
             continue
+        completions = t.get('completions')
+        if completions is None:
+            completions = [t['last_completed']] if t.get('last_completed') else []
+        if not isinstance(completions, list):
+            return jsonify({'error': f'completions must be a list for task "{name}"'}), 400
+        for ts in completions:
+            if not _valid_iso(ts):
+                return jsonify({'error': f'Invalid completion timestamp for task "{name}"'}), 400
+        snoozed_until = t.get('snoozed_until')
+        if snoozed_until and not _valid_iso(snoozed_until):
+            return jsonify({'error': f'Invalid snoozed_until for task "{name}"'}), 400
+        entries.append((t, name, completions))
+
+    count = 0
+    for t, name, completions in entries:
+        freq = t.get('frequency_days')
         task_id = add_task(
             name=name,
-            frequency_days=t.get('frequency_days', 7),
+            frequency_days=freq if isinstance(freq, int) else 7,
             schedule_type=t.get('schedule_type', 'interval'),
             fixed_unit=t.get('fixed_unit'),
             fixed_value=t.get('fixed_value'),
             notes=t.get('notes'),
             sensor_enabled=t.get('sensor_enabled', False),
         )
-        if t.get('last_completed'):
-            complete_task(task_id, completed_at=t['last_completed'])
+        for ts in sorted(completions, key=datetime.fromisoformat):
+            complete_task(task_id, completed_at=ts)
+        if 'snoozed_until' in t:
+            # Restore the exported snooze state, clearing any default snooze
+            # add_task applies to dynamic tasks.
+            edit_task(task_id, snoozed_until=t['snoozed_until'] or '')
         count += 1
     return jsonify({'ok': True, 'imported': count}), 201
 
