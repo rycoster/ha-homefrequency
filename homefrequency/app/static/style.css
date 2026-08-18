@@ -48,6 +48,7 @@ body {
     background: var(--bg);
     color: var(--text-primary);
     height: 100vh;
+    height: 100dvh; /* track the visual viewport when the keyboard opens */
     overflow: hidden;
     color-scheme: var(--color-scheme);
 }
@@ -56,8 +57,14 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
     max-width: 800px;
     margin: 0 auto;
+}
+
+button {
+    touch-action: manipulation; /* no 300ms delay / double-tap zoom on buttons */
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* App Logo */
@@ -338,6 +345,8 @@ body {
     font-size: 13px;
     margin-bottom: 2px;
     cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .name-edit {
@@ -366,6 +375,8 @@ body {
     font-size: 11px;
     color: var(--text-secondary);
     cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .freq-edit {
@@ -539,6 +550,8 @@ body.edit-mode .card-expanded .btn-history-delete {
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .date-correct {
@@ -600,17 +613,19 @@ body.edit-mode .card-expanded .btn-history-delete {
     transition: opacity 0.3s;
 }
 
-.task-card.snoozed:hover {
-    opacity: 0.8;
-}
-
 .task-card.tracking {
     opacity: 0.6;
     transition: opacity 0.3s;
 }
 
-.task-card.tracking:hover {
-    opacity: 0.9;
+@media (hover: hover) {
+    .task-card.snoozed:hover {
+        opacity: 0.8;
+    }
+
+    .task-card.tracking:hover {
+        opacity: 0.9;
+    }
 }
 
 .btn-snooze {
@@ -639,7 +654,7 @@ body.edit-mode .card-expanded .btn-history-delete {
     right: 0;
     margin-top: 4px;
     background: var(--card-bg, #fff);
-    border: 1px solid var(--border, #ccc);
+    border: 1px solid var(--divider);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     z-index: 1000;
@@ -659,8 +674,10 @@ body.edit-mode .card-expanded .btn-history-delete {
     cursor: pointer;
 }
 
-.snooze-menu button:hover {
-    background: var(--hover-bg);
+@media (hover: hover) {
+    .snooze-menu button:hover {
+        background: var(--hover-bg);
+    }
 }
 
 .task-actions {
@@ -717,9 +734,18 @@ body.edit-mode .card-expanded .btn-history-delete {
     color: var(--text-secondary);
 }
 
-.btn-delete:hover {
-    background: var(--error);
-    color: #fff;
+@media (hover: hover) {
+    .btn-delete:hover {
+        background: var(--error);
+        color: #fff;
+    }
+}
+
+.task-actions button:active,
+.snooze-menu button:active,
+.toggle-btn:active,
+.data-btn:active {
+    opacity: 0.6;
 }
 
 .task-card.confirming-delete {
@@ -752,8 +778,10 @@ body.edit-mode .card-expanded .btn-history-delete {
     transition: opacity 0.3s;
 }
 
-.task-card.distant:hover {
-    opacity: 0.8;
+@media (hover: hover) {
+    .task-card.distant:hover {
+        opacity: 0.8;
+    }
 }
 
 /* Completion history */
@@ -826,8 +854,10 @@ body.edit-mode .card-expanded .btn-history-delete {
     transition: opacity 0.2s;
 }
 
-.data-tools:hover {
-    opacity: 0.7;
+@media (hover: hover) {
+    .data-tools:hover {
+        opacity: 0.7;
+    }
 }
 
 .version-label {
@@ -999,10 +1029,35 @@ body.edit-mode .task-card.card-expanded .sensor-toggle-row {
     border-radius: 3px;
 }
 
-/* Responsive */
-@media (max-width: 400px) {
+/* Responsive — 600px covers all phones (390-430px is the modern norm) */
+@media (max-width: 600px) {
+    .app-logo-text {
+        font-size: 22px;
+        letter-spacing: 3px;
+    }
+
+    .app-logo-icon {
+        height: 28px;
+    }
+
     .add-task {
         flex-direction: column;
+    }
+
+    .add-task-row {
+        flex-wrap: wrap;
+    }
+
+    .add-task-row input[type="text"] {
+        flex: 1 1 100%;
+    }
+
+    .schedule-toggle {
+        flex: 1;
+    }
+
+    .toggle-btn {
+        flex: 1;
     }
 
     .freq-group {
@@ -1024,5 +1079,154 @@ body.edit-mode .task-card.card-expanded .sensor-toggle-row {
 
     .task-actions button {
         flex: 1;
+    }
+}
+
+/* Touch devices — 44px targets, no-zoom inputs, visible affordances */
+@media (pointer: coarse) {
+    /* 16px+ inputs stop iOS Safari from auto-zooming the page on focus */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+
+    /* Primary card actions: Reset / Zzz / Wake / Undo / Delete / Cancel / Confirm */
+    .task-actions {
+        gap: 10px;
+    }
+
+    .task-actions button {
+        min-height: 44px;
+        padding: 10px 14px;
+        font-size: 14px;
+    }
+
+    .btn-unsnooze {
+        font-size: 14px !important;
+    }
+
+    .btn-undo {
+        font-size: 14px;
+    }
+
+    .snooze-menu {
+        min-width: 170px;
+    }
+
+    .snooze-menu button {
+        padding: 14px 16px;
+        font-size: 15px;
+        min-height: 44px;
+    }
+
+    /* Top bar + add-task form controls */
+    .edit-mode-toggle,
+    .add-task-toggle {
+        padding: 12px 16px;
+        font-size: 15px;
+    }
+
+    .toggle-notes-btn {
+        padding: 10px 12px;
+        font-size: 16px;
+    }
+
+    .add-task button[type="submit"] {
+        padding: 10px 18px;
+        font-size: 15px;
+        min-height: 44px;
+    }
+
+    .toggle-btn {
+        padding: 10px 12px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .freq-group input,
+    .freq-group select {
+        padding: 10px 8px;
+        min-height: 44px;
+    }
+
+    .freq-group input {
+        width: 68px;
+    }
+
+    /* Inline frequency editors */
+    .freq-edit input,
+    .freq-edit select {
+        padding: 8px;
+        min-height: 40px;
+    }
+
+    .freq-edit input {
+        width: 68px;
+    }
+
+    .type-switch {
+        font-size: 14px !important;
+        padding: 8px !important;
+    }
+
+    /* Date editors */
+    .date-correct {
+        padding: 8px;
+        min-height: 44px;
+    }
+
+    .btn-date-confirm {
+        padding: 10px 16px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    /* History rows: taller, delete pushed to the far edge away from the date */
+    .task-card.card-expanded .task-history li {
+        padding: 6px 0;
+        font-size: 13px;
+    }
+
+    .task-card.card-expanded .task-history.open {
+        max-height: 420px;
+    }
+
+    body.edit-mode .card-expanded .btn-history-delete {
+        padding: 10px 14px;
+        margin-left: auto;
+        font-size: 16px;
+    }
+
+    /* Expanded-card indicators approach 44px */
+    .task-card.card-expanded .task-notes-indicator,
+    .task-card.card-expanded .task-history-indicator,
+    .task-card.card-expanded .sensor-icon {
+        padding: 10px 12px;
+    }
+
+    /* No hover on touch: keep dimmed cards and data tools readable */
+    .task-card.snoozed,
+    .task-card.distant {
+        opacity: 0.6;
+    }
+
+    .task-card.tracking {
+        opacity: 0.7;
+    }
+
+    .data-tools {
+        opacity: 0.6;
+    }
+
+    .data-btn {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    /* Edit-mode tap affordance: same dotted underline the history dates use */
+    body.edit-mode .task-card.card-expanded .task-name,
+    body.edit-mode .task-card.card-expanded .task-meta,
+    body.edit-mode .task-card.card-expanded .task-due {
+        border-bottom: 1px dotted var(--text-secondary);
+        padding: 6px 2px;
     }
 }

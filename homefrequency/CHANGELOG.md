@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.7.0
+
+Mobile UI overhaul — same features and layout, made touch-friendly:
+
+- All buttons and tap targets sized for fingers (44px) on touch devices: card actions, snooze menu, top bar, history rows, indicators
+- Form inputs no longer trigger iOS auto-zoom on focus (16px on touch devices)
+- Stacked phone layout now applies up to 600px wide, covering modern phones (previously only below 400px); the New Task form wraps instead of crushing
+- Date editing reworked for mobile: the native date picker opens immediately, dates save only when you tap Set (previously iOS could save a half-picked date mid-scroll), and editing a history date works the same way as backdating
+- In edit mode, tappable fields (name, frequency, due date) show a dotted underline so you can see what's editable
+- Snooze menu: dismissing it by tapping elsewhere no longer presses whatever was underneath; the menu flips upward instead of clipping off-screen near the bottom of the list
+- Delete confirmation: Cancel now sits where Delete was and Confirm arms after a moment, so an accidental double-tap can't instantly delete a task
+- Notes: multi-line notes now work on phones (Enter adds a newline; tap outside to save)
+- Tapping a collapsed card just expands it — no more accidentally toggling notes/history at the same time
+- Number fields bring up the numeric keypad; the list keeps its scroll position after actions; editors scroll into view above the keyboard
+- Stuck hover states (red Delete, faded cards) no longer occur on touch; snoozed/distant cards are more readable on phones
+
 ## 2.6.0
 - Security: the API is now ingress-only — removed the optional direct port mapping (the HA integration talks to the add-on over the internal Docker network, so nothing changes for it) and dropped the unused `share` and `data` mounts
 - The add-on no longer writes to your `configuration.yaml`. The integration now registers itself through Supervisor discovery; the legacy `homefrequency:` line from older versions is cleaned up automatically, so uninstalling the add-on no longer leaves an orphaned config entry behind

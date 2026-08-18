@@ -1,5 +1,21 @@
 const BASE = document.querySelector('base')?.getAttribute('href')?.replace(/\/$/, '') || '';
 
+// Touch device: no hover, no Shift+Enter, native pickers need showPicker()
+const COARSE_POINTER = window.matchMedia('(pointer: coarse)').matches;
+
+function openDatePicker(input) {
+    input.focus();
+    // focus() alone doesn't open the native picker on mobile
+    if (typeof input.showPicker === 'function') {
+        try { input.showPicker(); } catch (e) { /* requires user gesture; focus is the fallback */ }
+    }
+}
+
+function scrollEditorIntoView(el) {
+    // Keep the editor visible above the on-screen keyboard
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+}
+
 const addTaskForm = document.getElementById('add-task-form');
 const taskList = document.getElementById('task-list');
 const addTaskToggle = document.getElementById('add-task-toggle');
@@ -74,6 +90,9 @@ function closeSnoozeMenu() {
 
 function onDocClickCloseSnooze(e) {
     if (!e.target.closest('.snooze-menu') && !e.target.closest('.btn-snooze')) {
+        // Swallow the dismissing tap so it can't also press whatever is under it
+        e.preventDefault();
+        e.stopPropagation();
         closeSnoozeMenu();
     }
 }
@@ -92,6 +111,13 @@ function openSnoozeMenu(btn, id) {
         closeSnoozeMenu();
     });
     btn.parentElement.appendChild(menu);
+    // Flip upward when the menu would extend past the bottom of the viewport
+    const rect = menu.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 16) {
+        menu.style.bottom = '100%';
+        menu.style.marginTop = '0';
+        menu.style.marginBottom = '4px';
+    }
     setTimeout(() => document.addEventListener('click', onDocClickCloseSnooze, true), 0);
 }
 
@@ -191,6 +217,7 @@ const BUCKET_LABELS = {
 async function loadTasks(highlightId) {
     const res = await fetch(`${BASE}/api/tasks`);
     const tasks = await res.json();
+    const prevScroll = taskList.scrollTop;
     taskList.innerHTML = '';
 
     const logoWrap = document.createElement('div');
@@ -269,8 +296,8 @@ async function loadTasks(highlightId) {
         const hasHistory = task.completions && task.completions.length > 0;
         const notesOpen = hasNotes && (days <= 7 || days < 0);
         const sensorIcon = task.sensor_enabled ? '<span class="sensor-icon" title="HA sensor enabled"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#03a9f4" d="M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z"/></svg></span>' : '';
-        const indicatorHtml = `<span class="task-notes-indicator${hasNotes ? ' has-notes' : ''}" title="${hasNotes ? 'View notes' : 'Add notes'}">&#128172;</span>`;
-        const historyIndicatorHtml = `<span class="task-history-indicator${hasHistory ? ' has-history' : ''}" title="Completion history">&#128337;</span>`;
+        const indicatorHtml = `<span class="task-notes-indicator${hasNotes ? ' has-notes' : ''}" role="button" aria-label="${hasNotes ? 'View notes' : 'Add notes'}" title="${hasNotes ? 'View notes' : 'Add notes'}">&#128172;</span>`;
+        const historyIndicatorHtml = `<span class="task-history-indicator${hasHistory ? ' has-history' : ''}" role="button" aria-label="Completion history" title="Completion history">&#128337;</span>`;
 
         let historyHtml = '';
         if (hasHistory) {
@@ -285,7 +312,7 @@ async function loadTasks(highlightId) {
                     if (gapDays === 0) return '';
                     gapHtml = `<span class="history-gap">${formatGap(gapDays)}</span>`;
                 }
-                return `<li data-completion-id="${c.id}"><span class="history-date">${dateStr}</span>${gapHtml}<button class="btn-history-delete" title="Delete entry">&times;</button></li>`;
+                return `<li data-completion-id="${c.id}"><span class="history-date">${dateStr}</span>${gapHtml}<button class="btn-history-delete" aria-label="Delete entry" title="Delete entry">&times;</button></li>`;
             }).join('');
             historyHtml = `<div class="task-history"><span class="history-label">History</span><ul>${items}</ul></div>`;
         } else {
@@ -317,7 +344,7 @@ async function loadTasks(highlightId) {
             <div class="task-due ${dueClass}" title="Click to set when you last did this" data-id="${task.id}">${dueText}</div>
             <div class="task-actions">
                 ${isSnoozed ? `<button class="btn-unsnooze" onclick="unsnoozeTask(${task.id})">Wake</button>` : ''}
-                ${!isSnoozed && (days === null || days < 0) ? `<button class="btn-snooze" onclick="openSnoozeMenu(this, ${task.id})" title="Snooze">Zzz</button>` : ''}
+                ${!isSnoozed && (days === null || days < 0) ? `<button class="btn-snooze" onclick="openSnoozeMenu(this, ${task.id})" aria-label="Snooze" title="Snooze">Zzz</button>` : ''}
                 ${hasHistory ? `<button class="btn-undo" onclick="undoLastCompletion(${task.completions[0].id})" title="Undo last completion">Undo</button>` : ''}
                 <button class="btn-done" onclick="completeTask(${task.id})">Reset</button>
                 <button class="btn-delete" onclick="deleteTask(${task.id}, this)">Delete</button>
@@ -330,6 +357,10 @@ async function loadTasks(highlightId) {
             // When already expanded, also protect interactive content areas
             if (card.classList.contains('card-expanded') &&
                 e.target.closest('.task-notes-indicator, .task-history-indicator, .task-notes, .task-history')) return;
+            // In edit mode the name/frequency/due fields open inline editors;
+            // don't collapse the card out from under them
+            if (card.classList.contains('card-expanded') && editMode &&
+                e.target.closest('.task-name, .task-meta, .task-due')) return;
             toggleCardExpanded(card);
         });
 
@@ -348,6 +379,7 @@ async function loadTasks(highlightId) {
             nameEl.appendChild(input);
             input.focus();
             input.select();
+            scrollEditorIntoView(input);
 
             async function save() {
                 const val = input.value.trim();
@@ -454,6 +486,7 @@ async function loadTasks(highlightId) {
 
                 const numInput = document.createElement('input');
                 numInput.type = 'number';
+                numInput.inputMode = 'numeric';
                 numInput.min = '1';
                 numInput.value = num;
 
@@ -607,6 +640,7 @@ async function loadTasks(highlightId) {
 
                 const inp = document.createElement('input');
                 inp.type = 'number';
+                inp.inputMode = 'numeric';
                 inp.min = '1'; inp.max = '31';
                 inp.value = task.fixed_value;
                 wrap.appendChild(typeSelect);
@@ -687,6 +721,7 @@ async function loadTasks(highlightId) {
 
                 const dayInp = document.createElement('input');
                 dayInp.type = 'number';
+                dayInp.inputMode = 'numeric';
                 dayInp.min = '1'; dayInp.max = '31';
                 dayInp.value = curDay;
 
@@ -764,6 +799,7 @@ async function loadTasks(highlightId) {
             notesDiv.textContent = '';
             notesDiv.appendChild(textarea);
             textarea.focus();
+            scrollEditorIntoView(textarea);
 
             async function saveNotes() {
                 const val = textarea.value.trim();
@@ -780,7 +816,9 @@ async function loadTasks(highlightId) {
             }
 
             textarea.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); saveNotes(); }
+                // Mobile keyboards have no Shift+Enter; there, Enter inserts a
+                // newline and blur (tap outside) saves instead.
+                if (ev.key === 'Enter' && !ev.shiftKey && !COARSE_POINTER) { ev.preventDefault(); saveNotes(); }
                 if (ev.key === 'Escape') { notesDiv.textContent = original; }
             });
 
@@ -788,11 +826,13 @@ async function loadTasks(highlightId) {
         }
 
         indicator.addEventListener('click', () => {
+            // On a collapsed card the tap just expands the card (card handler)
+            if (!card.classList.contains('card-expanded')) return;
             if (notesDiv.classList.contains('open')) {
                 notesDiv.classList.remove('open');
             } else if (hasNotes) {
                 notesDiv.classList.add('open');
-            } else if (card.classList.contains('card-expanded') && editMode) {
+            } else if (editMode) {
                 openNotesEditor();
             }
         });
@@ -808,6 +848,7 @@ async function loadTasks(highlightId) {
 
         if (historyIndicator && historyDiv) {
             historyIndicator.addEventListener('click', () => {
+                if (!card.classList.contains('card-expanded')) return;
                 historyDiv.classList.toggle('open');
             });
 
@@ -840,33 +881,61 @@ async function loadTasks(highlightId) {
                     const originalText = dateSpan.textContent;
                     dateSpan.textContent = '';
                     dateSpan.appendChild(input);
-                    input.focus();
+
+                    const setBtn = document.createElement('button');
+                    setBtn.className = 'btn-date-confirm';
+                    setBtn.textContent = 'Set';
+                    dateSpan.appendChild(setBtn);
+
+                    openDatePicker(input);
+                    scrollEditorIntoView(input);
+
+                    // Save only on explicit confirm -- mobile pickers fire
+                    // 'change' on every wheel movement, mid-selection.
+                    let finished = false;
 
                     async function saveDate() {
+                        if (finished) return;
                         if (input.value) {
+                            finished = true;
                             await fetch(`${BASE}/api/completions/${completionId}`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ completed_at: input.value + 'T12:00:00' })
                             });
                             loadTasks(task.id);
-                        } else {
-                            dateSpan.textContent = originalText;
                         }
                     }
 
-                    input.addEventListener('change', saveDate);
+                    function cancelEdit() {
+                        finished = true;
+                        dateSpan.textContent = originalText;
+                    }
+
+                    function revertIfLeft() {
+                        // Some WebViews blur the input while the native picker
+                        // is open; give the tap on Set time to land.
+                        setTimeout(() => {
+                            if (finished) return;
+                            if (!dateSpan.contains(document.activeElement)) {
+                                cancelEdit();
+                            }
+                        }, 200);
+                    }
+
+                    setBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        saveDate();
+                    });
                     input.addEventListener('keydown', (ev) => {
-                        if (ev.key === 'Escape') dateSpan.textContent = originalText;
+                        if (ev.key === 'Escape') cancelEdit();
                         if (ev.key === 'Enter') saveDate();
                     });
-                    input.addEventListener('blur', () => {
-                        setTimeout(() => {
-                            if (!dateSpan.contains(document.activeElement)) {
-                                dateSpan.textContent = originalText;
-                            }
-                        }, 0);
+                    input.addEventListener('blur', (ev) => {
+                        if (ev.relatedTarget === setBtn) return;
+                        revertIfLeft();
                     });
+                    setBtn.addEventListener('blur', revertIfLeft);
                 }
             });
         }
@@ -893,48 +962,50 @@ async function loadTasks(highlightId) {
             const confirmBtn = document.createElement('button');
             confirmBtn.className = 'btn-date-confirm';
             confirmBtn.textContent = 'Set';
-            confirmBtn.style.display = 'none';
             dueEl.appendChild(confirmBtn);
 
-            input.focus();
+            openDatePicker(input);
+            scrollEditorIntoView(input);
 
-            input.addEventListener('change', () => {
-                if (input.value) {
-                    confirmBtn.style.display = '';
-                }
-            });
+            let finished = false;
 
-            confirmBtn.addEventListener('click', async () => {
+            async function saveDueDate() {
+                if (finished) return;
                 if (input.value) {
+                    finished = true;
                     await completeTaskAt(task.id, input.value);
                 }
+            }
+
+            function cancelEdit() {
+                finished = true;
+                dueEl.textContent = original;
+            }
+
+            function revertIfLeft() {
+                setTimeout(() => {
+                    if (finished) return;
+                    if (!dueEl.contains(document.activeElement)) {
+                        cancelEdit();
+                    }
+                }, 200);
+            }
+
+            confirmBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                saveDueDate();
             });
 
-            input.addEventListener('blur', (e) => {
-                if (e.relatedTarget === confirmBtn) return;
-                if (!confirmBtn.style.display && confirmBtn.style.display !== 'none') return;
-                setTimeout(() => {
-                    if (!dueEl.contains(document.activeElement)) {
-                        dueEl.textContent = original;
-                    }
-                }, 0);
+            input.addEventListener('blur', (ev) => {
+                if (ev.relatedTarget === confirmBtn) return;
+                revertIfLeft();
             });
 
-            confirmBtn.addEventListener('blur', () => {
-                setTimeout(() => {
-                    if (!dueEl.contains(document.activeElement)) {
-                        dueEl.textContent = original;
-                    }
-                }, 0);
-            });
+            confirmBtn.addEventListener('blur', revertIfLeft);
 
             input.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Escape') {
-                    dueEl.textContent = original;
-                }
-                if (ev.key === 'Enter' && input.value) {
-                    completeTaskAt(task.id, input.value);
-                }
+                if (ev.key === 'Escape') cancelEdit();
+                if (ev.key === 'Enter') saveDueDate();
             });
         });
 
@@ -956,6 +1027,9 @@ async function loadTasks(highlightId) {
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     });
+
+    // Keep the list where it was when nothing is being highlighted
+    if (!highlightId) taskList.scrollTop = prevScroll;
 }
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -1061,13 +1135,17 @@ function deleteTask(id, btn) {
     const confirmBtn = document.createElement('button');
     confirmBtn.className = 'btn-confirm-delete';
     confirmBtn.textContent = 'Confirm';
+    // Arm after a beat so a double-tap on Delete can't land on Confirm
+    confirmBtn.disabled = true;
+    setTimeout(() => { confirmBtn.disabled = false; }, 400);
     confirmBtn.addEventListener('click', async () => {
         await fetch(`${BASE}/api/tasks/${id}`, { method: 'DELETE' });
         loadTasks();
     });
 
-    actions.appendChild(cancelBtn);
+    // Confirm first, Cancel last -- Cancel occupies Delete's old position
     actions.appendChild(confirmBtn);
+    actions.appendChild(cancelBtn);
 }
 
 function escapeHtml(text) {
