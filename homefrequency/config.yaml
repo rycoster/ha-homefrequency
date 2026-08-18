@@ -1,6 +1,6 @@
 name: HomeFrequency
 description: Recurring task tracker
-version: 2.5.6
+version: 2.6.0
 slug: homefrequency
 arch:
   - amd64
@@ -13,9 +13,9 @@ ingress_port: 5050
 panel_icon: mdi:clipboard-check-outline
 panel_title: Home Frequency
 panel_admin: false
-ports:
-  "5050/tcp": null
+hassio_api: true
+homeassistant_api: true
+discovery:
+  - homefrequency
 map:
   - config:rw
-  - data:rw
-  - share:rw

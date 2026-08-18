@@ -12,66 +12,29 @@ if [ ! -f /config/homefrequency/tasks.db ] && [ -f /data/tasks.db ]; then
 fi
 
 # Deploy custom integration to HA config
-echo "Checking for /config directory..."
 if [ -d /config ]; then
+    # Redeploy fresh so files removed in newer versions don't linger
+    rm -rf /config/custom_components/homefrequency
     mkdir -p /config/custom_components/homefrequency
     cp -r /integration/* /config/custom_components/homefrequency/
     echo "Deployed homefrequency integration to /config/custom_components/"
 
-    # Ensure integration is loaded on next HA restart
-    if ! grep -q "^homefrequency:" /config/configuration.yaml 2>/dev/null; then
-        echo "" >> /config/configuration.yaml
-        echo "homefrequency:" >> /config/configuration.yaml
-        echo "Added homefrequency to configuration.yaml"
-    fi
-
-    # Notify on first run after install (flag file tracks this)
-    if [ ! -f /data/.integration_notified ] && [ -n "$SUPERVISOR_TOKEN" ]; then
-        python -c "
-import urllib.request, json, os
-token = os.environ['SUPERVISOR_TOKEN']
-req = urllib.request.Request(
-    'http://supervisor/core/api/services/persistent_notification/create',
-    data=json.dumps({
-        'notification_id': 'homefrequency_restart',
-        'title': 'Home Frequency',
-        'message': 'Home Frequency sensors have been installed. Please restart Home Assistant to activate them.'
-    }).encode(),
-    headers={
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
-    },
-    method='POST'
-)
-print('Sending notification with token: ' + token[:8] + '...')
-try:
-    urllib.request.urlopen(req)
-    print('Posted restart notification')
-except Exception as e:
-    print('Notification via Core API failed: ' + str(e))
-    # Try via Supervisor notification API instead
-    req2 = urllib.request.Request(
-        'http://supervisor/resolution/notification',
-        data=json.dumps({
-            'type': 'info',
-            'message': 'Home Frequency sensors installed. Restart Home Assistant to activate.'
-        }).encode(),
-        headers={
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json'
-        },
-        method='POST'
-    )
-    try:
-        urllib.request.urlopen(req2)
-        print('Posted via Supervisor notification API')
-    except Exception as e2:
-        print('Supervisor notification also failed: ' + str(e2))
-" 2>&1 || echo "Failed to post restart notification"
-        touch /data/.integration_notified
+    # Older versions appended a bare "homefrequency:" line to
+    # configuration.yaml; setup now happens via Supervisor discovery,
+    # so clean the legacy line up to avoid orphan warnings on uninstall.
+    if grep -q '^homefrequency:[[:space:]]*$' /config/configuration.yaml 2>/dev/null; then
+        sed -i '/^homefrequency:[[:space:]]*$/d' /config/configuration.yaml
+        echo "Removed legacy homefrequency: entry from configuration.yaml"
     fi
 else
     echo "/config NOT found -- config map not mounted?"
 fi
 
-python /app/main.py
+# Register with Supervisor discovery + first-install restart notice
+if [ -n "$SUPERVISOR_TOKEN" ]; then
+    python /app/announce.py || echo "Supervisor announce failed"
+else
+    echo "SUPERVISOR_TOKEN not set -- skipping discovery registration"
+fi
+
+exec gunicorn --chdir /app --bind 0.0.0.0:5050 --workers 1 --threads 4 main:app

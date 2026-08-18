@@ -168,12 +168,16 @@ def complete_task(task_id, completed_at=None):
     conn.close()
 
 
-def get_completions(task_id, conn):
+def get_completions_by_task(conn):
+    """Fetch all completions in one query, grouped by task, newest first."""
     rows = conn.execute(
-        'SELECT id, completed_at FROM task_completions WHERE task_id = ? ORDER BY completed_at DESC',
-        (task_id,)
+        'SELECT id, task_id, completed_at FROM task_completions ORDER BY completed_at DESC'
     ).fetchall()
-    return [{'id': row['id'], 'completed_at': row['completed_at']} for row in rows]
+    by_task = {}
+    for row in rows:
+        by_task.setdefault(row['task_id'], []).append(
+            {'id': row['id'], 'completed_at': row['completed_at']})
+    return by_task
 
 
 def _recalc_last_completed(task_id, conn):
@@ -337,6 +341,7 @@ def get_all_tasks():
     conn = get_db()
     conn.execute("PRAGMA foreign_keys = ON")
     rows = conn.execute('SELECT * FROM recurring_tasks').fetchall()
+    completions_by_task = get_completions_by_task(conn)
 
     now = datetime.now()
     tasks = []
@@ -345,7 +350,7 @@ def get_all_tasks():
         task = dict(row)
         task['sensor_enabled'] = bool(task.get('sensor_enabled'))
         stype = task.get('schedule_type') or 'interval'
-        task['completions'] = get_completions(task['id'], conn)
+        task['completions'] = completions_by_task.get(task['id'], [])
 
         # Check snooze state
         is_snoozed = False

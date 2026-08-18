@@ -18,7 +18,8 @@
       "cannot_connect": "Cannot connect to Home Frequency at the given host and port."
     },
     "abort": {
-      "already_configured": "Home Frequency is already configured."
+      "already_configured": "Home Frequency is already configured.",
+      "cannot_connect": "Cannot connect to the HomeFrequency add-on."
     }
   }
 }

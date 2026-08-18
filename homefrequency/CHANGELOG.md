@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.6.0
+- Security: the API is now ingress-only — removed the optional direct port mapping (the HA integration talks to the add-on over the internal Docker network, so nothing changes for it) and dropped the unused `share` and `data` mounts
+- The add-on no longer writes to your `configuration.yaml`. The integration now registers itself through Supervisor discovery; the legacy `homefrequency:` line from older versions is cleaned up automatically, so uninstalling the add-on no longer leaves an orphaned config entry behind
+- Integration files are redeployed fresh on every add-on start, so files removed in newer versions no longer linger in `custom_components`
+- The web app now runs under gunicorn instead of the Flask development server
+- The integration reuses Home Assistant's shared HTTP session instead of opening a new one every poll
+- The task list now loads completion history in a single query
+- The add-on no longer logs any portion of the Supervisor token
+- Integration manifest version now tracks the add-on version
+
 ## 2.5.6
 - Fixed-schedule tasks (weekly, monthly, yearly) now stay overdue at their missed date until you mark them done, instead of silently rolling forward to the next occurrence — completing then advances to the next date. A completion counts for the occurrence nearest to it, so doing a task a few days early or late still settles the date you meant
 - Fix: weekly fixed-schedule tasks could never show as due or overdue — on the target day they skipped straight to the following week

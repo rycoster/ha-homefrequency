@@ -4,6 +4,7 @@ from datetime import timedelta
 import aiohttp
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, SCAN_INTERVAL_SECONDS
@@ -21,21 +22,25 @@ class HomeFrequencyCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(seconds=SCAN_INTERVAL_SECONDS),
         )
-        self._url = f"http://{host}:{port}/api/tasks"
+        self._base_url = f"http://{host}:{port}"
+        self._session = async_get_clientsession(hass)
 
     async def _async_update_data(self) -> list[dict]:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self._url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    resp.raise_for_status()
-                    return await resp.json()
+            async with self._session.get(
+                f"{self._base_url}/api/tasks",
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                resp.raise_for_status()
+                return await resp.json()
         except Exception as err:
             raise UpdateFailed(f"Error fetching tasks: {err}") from err
 
     async def async_complete_task(self, task_id: int) -> None:
         """Mark a task as complete via the API."""
-        url = f"{self._url.rsplit('/api/tasks', 1)[0]}/api/tasks/{task_id}/complete"
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                resp.raise_for_status()
+        async with self._session.post(
+            f"{self._base_url}/api/tasks/{task_id}/complete",
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            resp.raise_for_status()
         await self.async_request_refresh()

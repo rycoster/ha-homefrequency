@@ -3,7 +3,7 @@
   "name": "Home Frequency",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "",
+  "documentation": "https://github.com/rycoster/ha-homefrequency",
   "iot_class": "local_polling",
-  "version": "2.4.0"
+  "version": "2.6.0"
 }

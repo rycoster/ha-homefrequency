@@ -5,6 +5,7 @@ from models import (init_db, add_task, complete_task, delete_task, edit_task,
                      get_all_tasks, delete_completion, edit_completion)
 
 app = Flask(__name__)
+init_db()
 
 
 def _valid_iso(value):

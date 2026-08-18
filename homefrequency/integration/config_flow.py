@@ -5,6 +5,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DOMAIN, ADDON_SLUG, DEFAULT_HOST, DEFAULT_PORT, DEFAULT_NAME
 
@@ -20,28 +21,42 @@ class HomeFrequencyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not token:
             return None
         try:
-            async with aiohttp.ClientSession() as session:
-                url = f"http://supervisor/addons/{ADDON_SLUG}/info"
-                headers = {"Authorization": f"Bearer {token}"}
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        info = data.get("data", {})
-                        if info.get("state") == "started":
-                            return info.get("hostname", DEFAULT_HOST)
+            session = async_get_clientsession(self.hass)
+            url = f"http://supervisor/addons/{ADDON_SLUG}/info"
+            headers = {"Authorization": f"Bearer {token}"}
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    info = data.get("data", {})
+                    if info.get("state") == "started":
+                        return info.get("hostname", DEFAULT_HOST)
         except Exception:
             pass
         return None
 
     async def _async_test_connection(self, host: str, port: int) -> bool:
         try:
-            async with aiohttp.ClientSession() as session:
-                url = f"http://{host}:{port}/api/tasks"
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    resp.raise_for_status()
-                    return True
+            session = async_get_clientsession(self.hass)
+            url = f"http://{host}:{port}/api/tasks"
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                resp.raise_for_status()
+                return True
         except Exception:
             return False
+
+    async def async_step_hassio(self, discovery_info) -> FlowResult:
+        """Handle Supervisor discovery posted by the add-on."""
+        config = discovery_info.config
+        host = config.get("host", DEFAULT_HOST)
+        port = config.get("port", DEFAULT_PORT)
+        await self.async_set_unique_id(f"{host}:{port}")
+        self._abort_if_unique_id_configured(updates={"host": host, "port": port})
+        if not await self._async_test_connection(host, port):
+            return self.async_abort(reason="cannot_connect")
+        return self.async_create_entry(
+            title=DEFAULT_NAME,
+            data={"host": host, "port": port},
+        )
 
     async def async_step_user(self, user_input=None) -> FlowResult:
         # First visit: try auto-detecting the add-on.
