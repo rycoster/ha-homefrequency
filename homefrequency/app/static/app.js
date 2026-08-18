@@ -30,15 +30,26 @@ editModeToggle.addEventListener('click', () => {
     editModeToggle.textContent = editMode ? 'Done' : 'Edit';
 });
 
+function resetCardPanels(card) {
+    // Collapsing a card returns it to its default presentation
+    const history = card.querySelector('.task-history');
+    if (history) history.classList.remove('open');
+    const notes = card.querySelector('.task-notes');
+    if (notes) notes.classList.toggle('open', notes.dataset.defaultOpen === '1');
+}
+
 function toggleCardExpanded(card) {
     const wasExpanded = card.classList.contains('card-expanded');
     // Collapse all other cards
     document.querySelectorAll('.task-card.card-expanded').forEach(c => {
         c.classList.remove('card-expanded');
+        resetCardPanels(c);
     });
     // Toggle this card
     if (!wasExpanded) {
         card.classList.add('card-expanded');
+    } else {
+        resetCardPanels(card);
     }
 }
 
@@ -319,7 +330,7 @@ async function loadTasks(highlightId) {
             historyHtml = '<div class="task-history"></div>';
         }
 
-        const notesHtml = `<div class="task-notes${notesOpen ? ' open' : ''}">${hasNotes ? linkifyText(escapeHtml(task.notes)) : ''}</div>`;
+        const notesHtml = `<div class="task-notes${notesOpen ? ' open' : ''}" data-default-open="${notesOpen ? '1' : '0'}">${hasNotes ? linkifyText(escapeHtml(task.notes)) : ''}</div>`;
 
         const sensorHtml = `<div class="sensor-toggle-row">
             <label class="sensor-toggle-label">

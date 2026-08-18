@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.7.1
+- Collapsing a card (tapping it again or tapping another card) now resets it to its default state — an open history panel closes, and notes return to their default (still auto-shown on due-soon/overdue tasks)
+
 ## 2.7.0
 
 Mobile UI overhaul — same features and layout, made touch-friendly:

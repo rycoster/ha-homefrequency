@@ -5,5 +5,5 @@
   "config_flow": true,
   "documentation": "https://github.com/rycoster/ha-homefrequency",
   "iot_class": "local_polling",
-  "version": "2.7.0"
+  "version": "2.7.1"
 }
