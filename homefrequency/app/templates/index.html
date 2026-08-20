@@ -8,14 +8,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/style.css?v=2.7.1">
+    <link rel="stylesheet" href="static/style.css?v=2.8.0">
 </head>
 <body>
     <script>const BASE_PATH = "{{ ingress_path }}";</script>
     <div class="container">
         <div class="top-bar">
             <button id="add-task-toggle" class="add-task-toggle">+ New Task</button>
-            <button id="edit-mode-toggle" class="edit-mode-toggle">Edit</button>
         </div>
         <form id="add-task-form" class="add-task">
             <div class="add-task-row">
@@ -75,12 +74,12 @@
         </form>
         <div id="task-list" class="task-list"></div>
         <div class="data-tools">
-            <span class="version-label">v2.7.1</span>
+            <span class="version-label">v2.8.0</span>
             <button id="btn-export" class="data-btn">Export</button>
             <button id="btn-import" class="data-btn">Import</button>
             <input type="file" id="import-file" accept=".json" style="display:none;">
         </div>
     </div>
-    <script src="static/app.js?v=2.7.1"></script>
+    <script src="static/app.js?v=2.8.0"></script>
 </body>
 </html>

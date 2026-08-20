@@ -19,16 +19,6 @@ function scrollEditorIntoView(el) {
 const addTaskForm = document.getElementById('add-task-form');
 const taskList = document.getElementById('task-list');
 const addTaskToggle = document.getElementById('add-task-toggle');
-const editModeToggle = document.getElementById('edit-mode-toggle');
-
-let editMode = false;
-
-editModeToggle.addEventListener('click', () => {
-    editMode = !editMode;
-    document.body.classList.toggle('edit-mode', editMode);
-    editModeToggle.classList.toggle('active', editMode);
-    editModeToggle.textContent = editMode ? 'Done' : 'Edit';
-});
 
 function resetCardPanels(card) {
     // Collapsing a card returns it to its default presentation
@@ -36,6 +26,10 @@ function resetCardPanels(card) {
     if (history) history.classList.remove('open');
     const notes = card.querySelector('.task-notes');
     if (notes) notes.classList.toggle('open', notes.dataset.defaultOpen === '1');
+    // ...and exits editing
+    card.classList.remove('card-editing');
+    const editBtn = card.querySelector('.btn-edit');
+    if (editBtn) editBtn.textContent = 'Edit';
 }
 
 function toggleCardExpanded(card) {
@@ -354,6 +348,7 @@ async function loadTasks(highlightId) {
             </div>
             <div class="task-due ${dueClass}" title="Click to set when you last did this" data-id="${task.id}">${dueText}</div>
             <div class="task-actions">
+                <button class="btn-edit">Edit</button>
                 ${isSnoozed ? `<button class="btn-unsnooze" onclick="unsnoozeTask(${task.id})">Wake</button>` : ''}
                 ${!isSnoozed && (days === null || days < 0) ? `<button class="btn-snooze" onclick="openSnoozeMenu(this, ${task.id})" aria-label="Snooze" title="Snooze">Zzz</button>` : ''}
                 ${hasHistory ? `<button class="btn-undo" onclick="undoLastCompletion(${task.completions[0].id})" title="Undo last completion">Undo</button>` : ''}
@@ -368,15 +363,21 @@ async function loadTasks(highlightId) {
             // When already expanded, also protect interactive content areas
             if (card.classList.contains('card-expanded') &&
                 e.target.closest('.task-notes-indicator, .task-history-indicator, .task-notes, .task-history')) return;
-            // In edit mode the name/frequency/due fields open inline editors;
+            // While editing, the name/frequency/due fields open inline editors;
             // don't collapse the card out from under them
-            if (card.classList.contains('card-expanded') && editMode &&
+            if (card.classList.contains('card-editing') &&
                 e.target.closest('.task-name, .task-meta, .task-due')) return;
             toggleCardExpanded(card);
         });
 
+        const editBtn = card.querySelector('.btn-edit');
+        editBtn.addEventListener('click', () => {
+            const editing = card.classList.toggle('card-editing');
+            editBtn.textContent = editing ? 'Done' : 'Edit';
+        });
+
         card.querySelector('.task-name').addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded') || !editMode) return;
+            if (!card.classList.contains('card-editing')) return;
             const nameEl = e.currentTarget;
             if (nameEl.querySelector('input')) return;
 
@@ -416,7 +417,7 @@ async function loadTasks(highlightId) {
 
         // Inline frequency editing
         card.querySelector('.task-meta').addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded') || !editMode) return;
+            if (!card.classList.contains('card-editing')) return;
             const metaEl = e.currentTarget;
             if (metaEl.querySelector('input, select')) return;
             metaEl.style.cursor = 'default';
@@ -843,14 +844,14 @@ async function loadTasks(highlightId) {
                 notesDiv.classList.remove('open');
             } else if (hasNotes) {
                 notesDiv.classList.add('open');
-            } else if (editMode) {
+            } else if (card.classList.contains('card-editing')) {
                 openNotesEditor();
             }
         });
 
         notesDiv.addEventListener('click', (e) => {
             if (e.target.closest('a')) return;
-            if (!card.classList.contains('card-expanded') || !editMode) return;
+            if (!card.classList.contains('card-editing')) return;
             if (!notesDiv.querySelector('textarea')) openNotesEditor();
         });
 
@@ -874,7 +875,7 @@ async function loadTasks(highlightId) {
                 }
 
                 const dateSpan = e.target.closest('.history-date');
-                if (dateSpan && card.classList.contains('card-expanded') && editMode) {
+                if (dateSpan && card.classList.contains('card-editing')) {
                     const li = dateSpan.closest('li');
                     const completionId = li.dataset.completionId;
                     if (dateSpan.querySelector('input')) return;
@@ -952,7 +953,7 @@ async function loadTasks(highlightId) {
         }
 
         card.querySelector('.task-due').addEventListener('click', (e) => {
-            if (!card.classList.contains('card-expanded') || !editMode) return;
+            if (!card.classList.contains('card-editing')) return;
             const dueEl = e.currentTarget;
             if (dueEl.querySelector('input')) return;
 

@@ -106,26 +106,6 @@ button {
     border-bottom: 1px solid var(--divider);
 }
 
-/* Edit Mode Toggle */
-.edit-mode-toggle {
-    padding: 7px 12px;
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 13px;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-
-.edit-mode-toggle:hover {
-    color: var(--text-primary);
-}
-
-.edit-mode-toggle.active {
-    color: var(--primary);
-    font-weight: 500;
-}
-
 /* Add Task Toggle */
 .add-task-toggle {
     padding: 7px 12px;
@@ -480,7 +460,7 @@ button {
     cursor: default;
 }
 
-body.edit-mode .card-expanded .history-date {
+.task-card.card-editing .history-date {
     cursor: pointer;
     border-bottom: 1px dotted var(--text-secondary);
 }
@@ -502,7 +482,7 @@ body.edit-mode .card-expanded .history-date {
     opacity: 1;
 }
 
-body.edit-mode .card-expanded .btn-history-delete {
+.task-card.card-editing .btn-history-delete {
     display: inline;
 }
 
@@ -880,15 +860,20 @@ body.edit-mode .card-expanded .btn-history-delete {
     color: var(--text-primary);
 }
 
-/* Edit mode — subtle page-level indicator */
-body.edit-mode {
-    box-shadow: inset 0 0 80px rgba(3, 169, 244, 0.25), inset 0 0 200px rgba(3, 169, 244, 0.08);
+/* Editing state — highlight scoped to the one card being edited */
+.task-card.card-editing {
+    box-shadow: 0 0 0 2px var(--primary), var(--shadow);
 }
 
-@media (prefers-color-scheme: dark) {
-    body.edit-mode {
-        box-shadow: inset 0 0 80px rgba(3, 169, 244, 0.25), inset 0 0 200px rgba(3, 169, 244, 0.08);
-    }
+/* Per-card Edit button */
+.btn-edit {
+    background: var(--hover-bg);
+    color: var(--text-secondary);
+}
+
+.task-card.card-editing .btn-edit {
+    background: var(--primary);
+    color: #fff;
 }
 
 /* Selected card — subtle highlight */
@@ -929,24 +914,24 @@ body.edit-mode {
     display: none;
 }
 
-body.edit-mode .task-card.card-expanded .btn-delete {
+.task-card.card-editing .btn-delete {
     display: inline-block;
 }
 
-/* Lock inline editing unless in edit mode */
-body:not(.edit-mode) .task-card.card-expanded .task-name {
+/* Lock inline editing unless the card is being edited */
+.task-card.card-expanded:not(.card-editing) .task-name {
     cursor: default;
 }
 
-body:not(.edit-mode) .task-card.card-expanded .task-meta {
+.task-card.card-expanded:not(.card-editing) .task-meta {
     cursor: default;
 }
 
-body:not(.edit-mode) .task-card.card-expanded .task-due {
+.task-card.card-expanded:not(.card-editing) .task-due {
     cursor: default;
 }
 
-body:not(.edit-mode) .task-card.card-expanded .task-notes {
+.task-card.card-expanded:not(.card-editing) .task-notes {
     cursor: default;
 }
 
@@ -984,7 +969,7 @@ body:not(.edit-mode) .task-card.card-expanded .task-notes {
     opacity: 0.8;
 }
 
-body.edit-mode .btn-undo {
+.task-card.card-editing .btn-undo {
     display: inline-block;
 }
 
@@ -993,7 +978,7 @@ body.edit-mode .btn-undo {
     display: none;
 }
 
-body.edit-mode .task-card.card-expanded .sensor-toggle-row {
+.task-card.card-editing .sensor-toggle-row {
     display: flex;
     padding: 6px 0;
 }
@@ -1119,7 +1104,6 @@ body.edit-mode .task-card.card-expanded .sensor-toggle-row {
     }
 
     /* Top bar + add-task form controls */
-    .edit-mode-toggle,
     .add-task-toggle {
         padding: 12px 16px;
         font-size: 15px;
@@ -1190,7 +1174,7 @@ body.edit-mode .task-card.card-expanded .sensor-toggle-row {
         max-height: 420px;
     }
 
-    body.edit-mode .card-expanded .btn-history-delete {
+    .task-card.card-editing .btn-history-delete {
         padding: 10px 14px;
         margin-left: auto;
         font-size: 16px;
@@ -1222,10 +1206,10 @@ body.edit-mode .task-card.card-expanded .sensor-toggle-row {
         font-size: 12px;
     }
 
-    /* Edit-mode tap affordance: same dotted underline the history dates use */
-    body.edit-mode .task-card.card-expanded .task-name,
-    body.edit-mode .task-card.card-expanded .task-meta,
-    body.edit-mode .task-card.card-expanded .task-due {
+    /* Editing tap affordance: same dotted underline the history dates use */
+    .task-card.card-editing .task-name,
+    .task-card.card-editing .task-meta,
+    .task-card.card-editing .task-due {
         border-bottom: 1px dotted var(--text-secondary);
         padding: 6px 2px;
     }

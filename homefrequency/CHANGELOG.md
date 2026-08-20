@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.8.0
+- Editing is now per-card instead of a global mode: each expanded card has its own Edit button that unlocks editing (name, schedule, dates, notes, history, HA sensor toggle, Undo, Delete) for that card only
+- The global Edit toggle and page-wide blue glow are gone; the card being edited gets a blue outline instead
+- Editing exits automatically when the card collapses or you tap another card — no mode left on to forget
+
 ## 2.7.1
 - Collapsing a card (tapping it again or tapping another card) now resets it to its default state — an open history panel closes, and notes return to their default (still auto-shown on due-soon/overdue tasks)
 
