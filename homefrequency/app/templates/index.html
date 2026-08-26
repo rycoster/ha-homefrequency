@@ -8,13 +8,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/style.css?v=2.10.0">
+    <link rel="stylesheet" href="static/style.css?v=2.11.0">
 </head>
 <body>
     <script>const BASE_PATH = "{{ ingress_path }}";</script>
     <div class="container">
         <div class="top-bar">
             <button id="add-task-toggle" class="add-task-toggle">+ New Task</button>
+            <input type="search" id="task-filter" class="task-filter" placeholder="Filter tasks…" autocomplete="off" spellcheck="false">
         </div>
         <form id="add-task-form" class="add-task">
             <div class="add-task-row">
@@ -74,13 +75,14 @@
         </form>
         <div id="task-list" class="task-list"></div>
         <div class="data-tools">
-            <span class="version-label">v2.10.0</span>
+            <span class="version-label">v2.11.0</span>
+            <a id="btn-qr-sheet" class="data-btn" href="qr-sheet" target="_blank" rel="noopener" title="Open a printable sheet of all tasks with QR enabled">Print QR sheet</a>
             <button id="btn-export" class="data-btn">Export</button>
             <button id="btn-import" class="data-btn">Import</button>
             <input type="file" id="import-file" accept=".json" style="display:none;">
         </div>
     </div>
-    <script src="static/vendor/qrcode.min.js?v=2.10.0"></script>
-    <script src="static/app.js?v=2.10.0"></script>
+    <script src="static/vendor/qrcode.min.js?v=2.11.0"></script>
+    <script src="static/app.js?v=2.11.0"></script>
 </body>
 </html>

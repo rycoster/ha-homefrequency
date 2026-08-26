@@ -120,6 +120,37 @@ button {
     color: var(--text-primary);
 }
 
+/* Task filter (top-bar) */
+.task-filter {
+    flex: 1;
+    max-width: 260px;
+    margin: 6px 12px 6px auto;
+    padding: 7px 12px;
+    background: var(--input-bg);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.task-filter::placeholder { color: var(--text-secondary); }
+.task-filter:focus {
+    border-color: var(--primary);
+    background: var(--card-bg);
+}
+
+.filter-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-style: italic;
+}
+
 /* Add Task Form */
 .add-task.open {
     display: flex;
@@ -984,13 +1015,29 @@ button {
 }
 
 .sensor-toggle-label {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     font-size: 0.8rem;
     color: var(--text-secondary);
     cursor: pointer;
     user-select: none;
+    padding: 5px 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--divider);
+    border-radius: 6px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.sensor-toggle-label:hover {
+    border-color: var(--primary);
+    color: var(--text-primary);
+}
+
+.sensor-toggle-label:has(input:checked) {
+    border-color: var(--primary);
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--primary) 8%, var(--input-bg));
 }
 
 .sensor-toggle-label input[type="checkbox"] {
@@ -1234,9 +1281,9 @@ button {
 }
 .qr-icon svg { vertical-align: middle; }
 
-/* QR checkbox sits alongside HA Sensor in the sensor-toggle-row */
+/* Space between the HA Sensor and QR chips in the sensor-toggle-row */
 .qr-toggle-label {
-    margin-left: 14px;
+    margin-left: 8px;
 }
 
 /* -------- QR modal -------- */
@@ -1445,11 +1492,11 @@ body.qr-modal-open { overflow: hidden; }
         display: none !important;
     }
     body.qr-printing .qr-code {
-        width: 3.2in;
+        width: 2.4in;
         border: none;
         padding: 0;
     }
     body.qr-printing .qr-task-name {
-        font-size: 22pt;
+        font-size: 16pt;
     }
 }

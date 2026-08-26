@@ -37,6 +37,12 @@ def list_tasks():
     return jsonify(get_all_tasks())
 
 
+@app.route('/qr-sheet')
+def qr_sheet():
+    ingress_path = request.headers.get('X-Ingress-Path', '')
+    return render_template('qr_sheet.html', ingress_path=ingress_path)
+
+
 @app.route('/api/tasks', methods=['POST'])
 def create_task():
     data = request.get_json()
@@ -240,13 +246,15 @@ def _supervisor_get(path, timeout=2):
 def qr_info():
     """Return the LAN URL a phone should use to scan QR codes for this add-on.
 
-    Uses the Supervisor API to look up the host's primary IPv4 and whether
-    port 5050 is currently mapped. Returns {available: false} outside HA
+    Prefers the host's mDNS hostname (e.g. "homeassistant.local") over its raw
+    IP so printed QRs don't leak subnet info. Falls back to the primary IPv4
+    if the hostname isn't available. Returns {available: false} outside HA
     (e.g. local dev), letting the modal fall back to window.location.origin.
     """
     net = _supervisor_get('/network/info')
     addon = _supervisor_get('/addons/self/info')
-    if net is None and addon is None:
+    host = _supervisor_get('/host/info')
+    if net is None and addon is None and host is None:
         return jsonify({'available': False})
 
     lan_ip = None
@@ -261,6 +269,13 @@ def qr_info():
             if addrs:
                 lan_ip = addrs[0].split('/')[0]
 
+    hostname = None
+    if host and isinstance(host.get('data'), dict):
+        raw = host['data'].get('hostname')
+        if raw:
+            # Append .local for mDNS resolution unless it's already a FQDN
+            hostname = raw if '.' in raw else f'{raw}.local'
+
     port_5050 = None
     if addon and isinstance(addon.get('data'), dict):
         port_map = addon['data'].get('network') or {}
@@ -268,24 +283,135 @@ def qr_info():
 
     return jsonify({
         'available': True,
+        'hostname': hostname,
         'lan_ip': lan_ip,
         'port': port_5050,
         'port_enabled': bool(port_5050),
     })
 
 
-@app.route('/q/<int:task_id>/<token>')
-def qr_complete(task_id, token):
+_DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+_MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+
+def _fmt_date(dt):
+    """Format like 'Aug 26, 2026' without a leading zero on the day."""
+    return f"{_MONTHS[dt.month]} {dt.day}, {dt.year}"
+
+
+def _human_days_ago(dt):
+    delta = (datetime.now().date() - dt.date()).days
+    if delta == 0:
+        return 'today'
+    if delta == 1:
+        return 'yesterday'
+    return f'{delta} days ago'
+
+
+def _add_human_labels(task):
+    """Add human-readable strings for the qr_task template."""
+    # last_completed
+    last = None
+    if task.get('last_completed'):
+        try:
+            last = datetime.fromisoformat(task['last_completed'])
+        except (TypeError, ValueError):
+            pass
+    task['last_completed_human'] = (
+        f'{_fmt_date(last)} · {_human_days_ago(last)}' if last else 'Never'
+    )
+
+    # schedule
+    stype = task.get('schedule_type') or 'interval'
+    if stype == 'dynamic':
+        dyn = task.get('dynamic') or {}
+        pred = dyn.get('predicted_days')
+        if pred:
+            season = dyn.get('season') or 'overall'
+            task['schedule_human'] = f'Dynamic — avg {pred} days ({season})'
+        else:
+            task['schedule_human'] = 'Dynamic — still learning'
+    elif stype == 'fixed':
+        unit = task.get('fixed_unit')
+        val = task.get('fixed_value')
+        if unit == 'weekly' and val is not None and 0 <= val < 7:
+            task['schedule_human'] = f'Every {_DOW[val]}'
+        elif unit == 'monthly' and val is not None:
+            task['schedule_human'] = f'Monthly on day {val}'
+        elif unit == 'yearly' and val is not None:
+            m, d = val // 100, val % 100
+            if 1 <= m <= 12:
+                task['schedule_human'] = f'Yearly on {_MONTHS[m]} {d}'
+            else:
+                task['schedule_human'] = 'Yearly'
+        else:
+            task['schedule_human'] = 'Fixed'
+    else:
+        days = task.get('frequency_days') or 0
+        labels = {1: 'Every day', 7: 'Every week', 14: 'Every 2 weeks',
+                  30: 'Every month', 365: 'Every year'}
+        task['schedule_human'] = labels.get(days, f'Every {days} days')
+
+    # next_due
+    if task.get('next_due'):
+        try:
+            task['next_due_human'] = _fmt_date(datetime.fromisoformat(task['next_due']))
+        except (TypeError, ValueError):
+            task['next_due_human'] = ''
+
+    # completions — dates + gap-to-previous
+    completions = task.get('completions') or []
+    for i, c in enumerate(completions[:5]):
+        try:
+            d = datetime.fromisoformat(c['completed_at'])
+            c['date_human'] = _fmt_date(d)
+        except (TypeError, ValueError):
+            c['date_human'] = c.get('completed_at', '')
+        c['gap_human'] = ''
+        if i + 1 < len(completions):
+            try:
+                cur = datetime.fromisoformat(c['completed_at'])
+                nxt = datetime.fromisoformat(completions[i + 1]['completed_at'])
+                gap = (cur.date() - nxt.date()).days
+                if gap > 0:
+                    c['gap_human'] = f'+{gap}d'
+            except (TypeError, ValueError):
+                pass
+    return task
+
+
+def _enrich_task(task_id):
+    """Return the enriched task dict for a single task, with human labels."""
+    for t in get_all_tasks():
+        if t['id'] == task_id:
+            return _add_human_labels(t)
+    return None
+
+
+@app.route('/q/<int:task_id>/<token>', methods=['GET'])
+def qr_view(task_id, token):
+    """Landing page for a scanned QR code. Shows task info; does NOT modify
+    state. The user must press the Mark Complete button to record anything."""
     task = find_task_by_qr(task_id, token)
     if not task or not task.get('qr_enabled'):
-        return render_template('qr_result.html', ok=False, task_name=None,
-                               message='This QR code is not active for this task.'), 404
+        return render_template('qr_task.html', error='This QR code is not active for this task.'), 404
+    enriched = _enrich_task(task_id)
+    if not enriched:
+        return render_template('qr_task.html', error='Task not found.'), 404
+    return render_template('qr_task.html', task=enriched)
+
+
+@app.route('/q/<int:task_id>/<token>/complete', methods=['POST'])
+def qr_mark_complete(task_id, token):
+    """POST target for the Mark Complete button on the QR landing page."""
+    task = find_task_by_qr(task_id, token)
+    if not task or not task.get('qr_enabled'):
+        return render_template('qr_task.html', error='This QR code is not active for this task.'), 404
     recorded = complete_task(task_id)
-    if recorded:
-        return render_template('qr_result.html', ok=True, task_name=task['name'],
-                               message='Marked complete.', deduped=False)
-    return render_template('qr_result.html', ok=True, task_name=task['name'],
-                           message='Already marked complete today.', deduped=True)
+    enriched = _enrich_task(task_id)
+    return render_template('qr_task.html', task=enriched,
+                           just_completed=recorded,
+                           already_today=not recorded)
 
 
 if __name__ == '__main__':

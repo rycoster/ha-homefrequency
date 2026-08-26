@@ -222,6 +222,13 @@ const BUCKET_LABELS = {
 async function loadTasks(highlightId) {
     const res = await fetch(`${BASE}/api/tasks`);
     const tasks = await res.json();
+
+    // Show the Print QR sheet link only when at least one task has QR enabled
+    const qrSheetBtn = document.getElementById('btn-qr-sheet');
+    if (qrSheetBtn) {
+        qrSheetBtn.style.display = tasks.some(t => t.qr_enabled) ? '' : 'none';
+    }
+
     const prevScroll = taskList.scrollTop;
     taskList.innerHTML = '';
 
@@ -256,6 +263,7 @@ async function loadTasks(highlightId) {
 
         const card = document.createElement('div');
         card.className = 'task-card';
+        card.dataset.search = [task.name || '', task.notes || ''].join(' ').toLowerCase();
 
         let dueText, dueClass;
         const days = task.days_until;
@@ -1060,8 +1068,54 @@ async function loadTasks(highlightId) {
         }
     });
 
-    // Keep the list where it was when nothing is being highlighted
+    // Re-apply any active filter after re-render, then restore scroll
+    applyTaskFilter();
     if (!highlightId) taskList.scrollTop = prevScroll;
+}
+
+function applyTaskFilter() {
+    const input = document.getElementById('task-filter');
+    const q = (input?.value || '').trim().toLowerCase();
+    const cards = taskList.querySelectorAll('.task-card');
+    let visibleCount = 0;
+    cards.forEach(card => {
+        const match = !q || (card.dataset.search || '').includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+    // Hide bucket separators that end up with no visible cards immediately after
+    taskList.querySelectorAll('.timeline-sep').forEach(sep => {
+        let el = sep.nextElementSibling;
+        let hasVisibleCard = false;
+        while (el && !el.classList.contains('timeline-sep')) {
+            if (el.classList.contains('task-card') && el.style.display !== 'none') {
+                hasVisibleCard = true;
+                break;
+            }
+            el = el.nextElementSibling;
+        }
+        sep.style.display = hasVisibleCard ? '' : 'none';
+    });
+    // Also collapse the app-logo header when filtering, for more room
+    const logo = taskList.querySelector('.app-logo-row');
+    if (logo) logo.style.display = q ? 'none' : '';
+    // Empty-state message
+    let emptyEl = taskList.querySelector('.filter-empty');
+    if (q && visibleCount === 0) {
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.className = 'filter-empty';
+            taskList.appendChild(emptyEl);
+        }
+        emptyEl.textContent = `No tasks match "${q}"`;
+    } else if (emptyEl) {
+        emptyEl.remove();
+    }
+}
+
+const taskFilterInput = document.getElementById('task-filter');
+if (taskFilterInput) {
+    taskFilterInput.addEventListener('input', applyTaskFilter);
 }
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -1292,7 +1346,7 @@ async function openQrModal(btn) {
             <div class="qr-body"></div>
             <div class="qr-actions">
                 <button type="button" class="qr-btn qr-btn-secondary" data-action="close">Close</button>
-                <button type="button" class="qr-btn qr-btn-primary" data-action="print">Print</button>
+                <button type="button" class="qr-btn qr-btn-primary" data-action="print" title="Prints just this one QR + task name (2.4in wide). To print multiple QRs on one page, use 'Print QR sheet' on the main screen.">Print</button>
             </div>
         </div>
     `;
@@ -1333,11 +1387,14 @@ async function openQrModal(btn) {
     // Priority: user override (localStorage) > detected LAN URL > current origin fallback
     let baseUrl;
     let source; // 'override' | 'auto' | 'fallback'
+    // Prefer hostname (e.g. homeassistant.local) over raw IP so printed QRs
+    // don't leak subnet info to anyone who scans a lost printout.
+    const autoHost = info.hostname || info.lan_ip;
     if (savedOverride) {
         baseUrl = savedOverride;
         source = 'override';
-    } else if (info.available && info.port_enabled && info.lan_ip && info.port) {
-        baseUrl = `http://${info.lan_ip}:${info.port}`;
+    } else if (info.available && info.port_enabled && autoHost && info.port) {
+        baseUrl = `http://${autoHost}:${info.port}`;
         source = 'auto';
     } else {
         baseUrl = window.location.origin + (BASE || '');
@@ -1372,16 +1429,19 @@ async function openQrModal(btn) {
         } else {
             const detected = source === 'auto';
             const usingOverride = source === 'override';
+            const portNote = (detected && info.port)
+                ? ` (host port <strong>${info.port}</strong> from this add-on's Network settings)`
+                : '';
             html = `
-                ${detected ? `<div class="qr-hint qr-hint-ok">✓ Auto-detected LAN URL — scan and go.</div>` : ''}
+                ${detected ? `<div class="qr-hint qr-hint-ok">✓ Auto-detected LAN URL${portNote}. Scan and go.</div>` : ''}
                 ${usingOverride ? `<div class="qr-hint">Using your saved custom URL. <button type="button" class="qr-reset-btn">Reset to auto</button></div>` : ''}
                 <details class="qr-override-details" ${detected ? '' : 'open'}>
-                    <summary>Change URL</summary>
+                    <summary>Override URL</summary>
                     <label class="qr-base-label">
                         Base URL
                         <input type="url" class="qr-base-input" spellcheck="false" autocomplete="off" value="${escapeAttr(baseUrl)}">
                     </label>
-                    <div class="qr-hint">For Nabu Casa, a reverse proxy, or a different LAN IP. Saved locally in this browser.</div>
+                    <div class="qr-hint">For Nabu Casa, a reverse proxy, or a different LAN IP. Saved locally in this browser — no change needed unless the auto-detected URL doesn't work from your phone.</div>
                 </details>
             `;
         }
@@ -1400,8 +1460,8 @@ async function openQrModal(btn) {
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
                 try { localStorage.removeItem(QR_BASE_STORAGE_KEY); } catch {}
-                if (info.available && info.port_enabled && info.lan_ip && info.port) {
-                    baseUrl = `http://${info.lan_ip}:${info.port}`;
+                if (info.available && info.port_enabled && autoHost && info.port) {
+                    baseUrl = `http://${autoHost}:${info.port}`;
                     source = 'auto';
                 } else {
                     baseUrl = window.location.origin + (BASE || '');

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if task %}{{ task.name }}{% else %}QR error{% endif %} — HomeFrequency</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            min-height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f6f8;
+            color: #1a1f2c;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+        @media (min-height: 600px) {
+            body { align-items: center; }
+        }
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 28px 24px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 36px;
+            letter-spacing: 0.03em;
+            line-height: 1.05;
+            color: #0e1525;
+            word-break: break-word;
+            margin-bottom: 8px;
+        }
+        .status-pill {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            margin-bottom: 20px;
+        }
+        .status-overdue { background: #fde8e8; color: #c53030; }
+        .status-today { background: #fff4d6; color: #a67c00; }
+        .status-soon { background: #e7f3ff; color: #1e6ea8; }
+        .status-later { background: #e7f7ed; color: #1e9e51; }
+        .status-tracking { background: #eef0f4; color: #6a7384; }
+
+        .banner {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .banner-ok { background: #e7f7ed; color: #1e6e3a; }
+        .banner-info { background: #fff4d6; color: #7a5a00; }
+        .banner-err { background: #fde8e8; color: #c53030; }
+        .banner .mark { font-size: 18px; line-height: 1; }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .info-label {
+            color: #6a7384;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            align-self: center;
+        }
+        .info-value { color: #2a3142; }
+        .info-value.muted { color: #9aa2b1; font-style: italic; }
+
+        .history {
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            background: #f8f9fb;
+            border-radius: 10px;
+        }
+        .history-label {
+            font-size: 11px;
+            color: #6a7384;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+        .history ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .history li {
+            font-size: 13px;
+            color: #2a3142;
+            display: flex;
+            justify-content: space-between;
+        }
+        .history li .gap {
+            color: #9aa2b1;
+            font-size: 12px;
+        }
+
+        .notes {
+            padding: 12px 14px;
+            background: #f8f9fb;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #2a3142;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .notes a { color: #1e6ea8; }
+
+        form.mark-form { display: block; }
+        .btn-mark {
+            width: 100%;
+            padding: 16px;
+            background: #1e9e51;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.05s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .btn-mark:hover { opacity: 0.92; }
+        .btn-mark:active { transform: scale(0.98); }
+        .btn-mark[disabled] {
+            background: #cbd0d9;
+            cursor: default;
+        }
+        .btn-mark[disabled]:active { transform: none; }
+
+        .footer-link {
+            display: block;
+            text-align: center;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #9aa2b1;
+            text-decoration: none;
+        }
+        .footer-link:hover { color: #1e6ea8; }
+    </style>
+</head>
+<body>
+    <div class="card">
+    {% if error %}
+        <div class="banner banner-err"><span class="mark">!</span>{{ error }}</div>
+        <a class="footer-link" href="/">Open HomeFrequency</a>
+    {% else %}
+        <h1>{{ task.name }}</h1>
+
+        {% set d = task.days_until %}
+        {% if d is none %}
+            <span class="status-pill status-tracking">Tracking — not enough data</span>
+        {% elif task.is_overdue %}
+            <span class="status-pill status-overdue">
+                {% if d == -1 %}Overdue by 1 day{% else %}Overdue by {{ d|abs }} days{% endif %}
+            </span>
+        {% elif d == 0 %}
+            <span class="status-pill status-today">Due today</span>
+        {% elif d <= 7 %}
+            <span class="status-pill status-soon">Due in {{ d }} day{{ 's' if d != 1 else '' }}</span>
+        {% else %}
+            <span class="status-pill status-later">Due in {{ d }} days</span>
+        {% endif %}
+
+        {% if just_completed %}
+            <div class="banner banner-ok"><span class="mark">✓</span>Marked complete!</div>
+        {% elif already_today %}
+            <div class="banner banner-info"><span class="mark">✓</span>Already marked complete today.</div>
+        {% endif %}
+
+        <div class="info-grid">
+            <span class="info-label">Last done</span>
+            <span class="info-value {{ 'muted' if not task.last_completed else '' }}">
+                {% if task.last_completed %}
+                    {{ task.last_completed_human }}
+                {% else %}
+                    Never
+                {% endif %}
+            </span>
+
+            <span class="info-label">Schedule</span>
+            <span class="info-value">{{ task.schedule_human }}</span>
+
+            {% if task.next_due and not task.is_overdue %}
+            <span class="info-label">Next due</span>
+            <span class="info-value">{{ task.next_due_human }}</span>
+            {% endif %}
+        </div>
+
+        {% if task.completions and task.completions|length > 1 %}
+        <div class="history">
+            <div class="history-label">Recent completions</div>
+            <ul>
+                {% for c in task.completions[:5] %}
+                <li>
+                    <span>{{ c.date_human }}</span>
+                    {% if c.gap_human %}<span class="gap">{{ c.gap_human }}</span>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if task.notes %}
+        <div class="notes">{{ task.notes }}</div>
+        {% endif %}
+
+        <form class="mark-form" method="POST" action="{{ request.path }}/complete">
+            {% if already_today or just_completed %}
+                <button type="submit" class="btn-mark" disabled>Already done today</button>
+            {% else %}
+                <button type="submit" class="btn-mark">Mark Complete</button>
+            {% endif %}
+        </form>
+
+        <a class="footer-link" href="/">Open HomeFrequency</a>
+    {% endif %}
+    </div>
+</body>
+</html>

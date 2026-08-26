@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.11.0
+- **Scanning a QR no longer auto-completes the task.** It now lands on an info page showing the task name, current status (Overdue / Due today / Due in N days), last completed date + "how long ago", schedule, next due date, and recent completions. A big **Mark Complete** button is the only thing that records a completion — no side effects from just scanning
+- After pressing Mark Complete the page reloads with a "✓ Marked complete!" banner and the button greys out ("Already done today") so a follow-up scan can't double-log
+- **Print QR sheet** link added to the main-screen footer (next to Export/Import) — opens a printable grid of every QR-enabled task on one page. Link is hidden when no tasks have QR enabled
+- **Text filter** in the top bar next to "+ New Task" — instant substring match against task names and notes. Empty buckets get hidden while filtering; a "no tasks match…" message appears when nothing matches
+- Single-QR printout is now **75% smaller** (2.4in wide, 16pt label) so it fits better on stickers or shared paper
+- Print button in the single-QR modal has a tooltip pointing users at the QR sheet for multi-print scenarios
+- Print sheet auto-detects the LAN URL the same way the modal does, warns if port 5050 isn't enabled, and uses your saved override URL if you set one
+- Auto-detected URLs now prefer your Home Assistant host's mDNS name (e.g. `homeassistant.local:1234`) over its raw IP (`192.168.1.87:1234`). Printed QRs that end up in the wrong hands no longer leak your subnet — someone off your network can't do anything with the hostname alone. IP fallback still kicks in if the hostname isn't available. Requires `hassio_api: true` (already enabled)
+
+## 2.10.1
+- QR modal now shows which host port was auto-detected — e.g. "host port 1234 from this add-on's Network settings" — so you know why the URL uses a port other than 5050 (5050 is the internal container port; HA lets you map it to any external port)
+- Renamed "Change URL" to "Override URL" and clarified that you don't need to touch it unless the auto-detected URL doesn't work from your phone
+- HA Sensor and QR toggles in a task's edit view now look like proper chip buttons (border + padding + hover state) instead of unstyled checkbox+label pairs. Checked state gets a subtle blue tint so the on/off is obvious at a glance
+
 ## 2.10.0
 - QR modal now auto-detects the LAN URL your phone should hit — no more editing `http://192.168.x.x:5050` by hand
 - If port 5050 isn't enabled in the add-on's Network settings, the modal shows step-by-step instructions and hides the Print button until the port is available (scanning would 401 otherwise)

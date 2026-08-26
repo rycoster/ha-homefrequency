@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Sheet — HomeFrequency</title>
+    <base href="{{ ingress_path }}/">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f6f8;
+            color: #1a1f2c;
+            min-height: 100vh;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: #fff;
+            border-bottom: 1px solid #eef0f4;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #0e1525;
+        }
+        .header-actions { display: flex; gap: 10px; align-items: center; }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-primary { background: #03a9f4; color: #fff; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary { background: transparent; color: #6a7384; text-decoration: none; padding: 8px 10px; }
+        .btn-secondary:hover { color: #0e1525; }
+
+        .status {
+            padding: 12px 24px;
+            font-size: 13px;
+            color: #6a7384;
+            text-align: center;
+        }
+        .status .warn { color: #a67c00; }
+        .status a { color: #1e6ea8; }
+
+        .sheet {
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .sheet-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+        @media (max-width: 720px) {
+            .sheet-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .sheet-grid { grid-template-columns: 1fr; }
+        }
+        .cell {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 14px 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            break-inside: avoid;
+            border: 1px solid #eef0f4;
+        }
+        .cell-qr {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #fff;
+            padding: 6px;
+        }
+        .cell-qr svg { display: block; width: 100%; height: auto; shape-rendering: crispEdges; }
+        .cell-name {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 17px;
+            letter-spacing: 0.03em;
+            color: #0e1525;
+            text-align: center;
+            line-height: 1.1;
+            word-break: break-word;
+        }
+        .empty {
+            padding: 60px 24px;
+            text-align: center;
+            color: #6a7384;
+        }
+        .empty h2 { font-family: 'Bebas Neue', sans-serif; font-size: 32px; margin-bottom: 10px; color: #0e1525; }
+
+        @media print {
+            @page { margin: 0.4in; }
+            header, .status { display: none !important; }
+            body { background: #fff; }
+            .sheet { padding: 0; max-width: none; }
+            .sheet-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+            .cell {
+                border: 1px solid #e5e7eb;
+                padding: 10px 8px 8px;
+            }
+            .cell-qr { padding: 2px; }
+            .cell-name { font-size: 14pt; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Printable QR sheet</h1>
+        <div class="header-actions">
+            <a class="btn btn-secondary" href="./">← Back</a>
+            <button type="button" class="btn btn-primary" id="btn-print">Print</button>
+        </div>
+    </header>
+    <div class="status" id="status">Loading…</div>
+    <div class="sheet" id="sheet"></div>
+
+    <script src="static/vendor/qrcode.min.js?v=2.11.0"></script>
+    <script>
+        const BASE = document.querySelector('base')?.getAttribute('href')?.replace(/\/$/, '') || '';
+        const QR_BASE_STORAGE_KEY = 'hf_qr_base_url_override';
+
+        function buildQrUrl(base, taskId, token) {
+            const trimmed = (base || '').replace(/\/+$/, '');
+            return `${trimmed}/q/${taskId}/${encodeURIComponent(token)}`;
+        }
+
+        function renderQrInto(container, text) {
+            container.innerHTML = '';
+            if (!text || typeof qrcode !== 'function') return;
+            const qr = qrcode(0, 'M');
+            qr.addData(text);
+            qr.make();
+            container.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+            const svg = container.querySelector('svg');
+            if (svg) {
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+            }
+        }
+
+        function escapeHtml(t) {
+            const d = document.createElement('div'); d.textContent = t; return d.innerHTML;
+        }
+
+        async function init() {
+            const status = document.getElementById('status');
+            const sheet = document.getElementById('sheet');
+
+            let tasks = [];
+            let info = { available: false };
+            try {
+                const [tRes, iRes] = await Promise.all([
+                    fetch(`${BASE}/api/tasks`),
+                    fetch(`${BASE}/api/qr-info`),
+                ]);
+                tasks = await tRes.json();
+                info = await iRes.json();
+            } catch (e) {
+                status.innerHTML = `<span class="warn">Could not load tasks.</span>`;
+                return;
+            }
+
+            const enabled = tasks.filter(t => t.qr_enabled);
+            if (enabled.length === 0) {
+                status.textContent = '';
+                sheet.innerHTML = `<div class="empty">
+                    <h2>No QR codes to print</h2>
+                    <p>Enable the QR toggle on at least one task, then come back.</p>
+                </div>`;
+                document.getElementById('btn-print').disabled = true;
+                return;
+            }
+
+            // Choose base URL — same priority as the modal
+            let override = null;
+            try { override = localStorage.getItem(QR_BASE_STORAGE_KEY); } catch {}
+            let baseUrl;
+            let portClosed = false;
+            const autoHost = info.hostname || info.lan_ip;
+            if (override) {
+                baseUrl = override;
+            } else if (info.available && info.port_enabled && autoHost && info.port) {
+                baseUrl = `http://${autoHost}:${info.port}`;
+            } else if (info.available && !info.port_enabled) {
+                baseUrl = window.location.origin;
+                portClosed = true;
+            } else {
+                baseUrl = window.location.origin + (BASE || '');
+            }
+
+            if (portClosed) {
+                status.innerHTML = `<span class="warn">⚠ Port 5050 isn't enabled in this add-on's Network settings — printed QRs will not resolve from a phone. <a href="./">Fix that first</a>.</span>`;
+            } else {
+                status.innerHTML = `Printing <strong>${enabled.length}</strong> QR code${enabled.length !== 1 ? 's' : ''} · Base URL: <code>${escapeHtml(baseUrl)}</code>`;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'sheet-grid';
+            enabled.forEach(t => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                const qr = document.createElement('div');
+                qr.className = 'cell-qr';
+                const url = buildQrUrl(baseUrl, t.id, t.qr_token);
+                renderQrInto(qr, url);
+                const name = document.createElement('div');
+                name.className = 'cell-name';
+                name.textContent = t.name;
+                cell.appendChild(qr);
+                cell.appendChild(name);
+                grid.appendChild(cell);
+            });
+            sheet.appendChild(grid);
+        }
+
+        document.getElementById('btn-print').addEventListener('click', () => window.print());
+        init();
+    </script>
+</body>
+</html>
