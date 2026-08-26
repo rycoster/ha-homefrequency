@@ -1,4 +1,6 @@
 import os
+import json
+import urllib.request
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from models import (init_db, add_task, complete_task, delete_task, edit_task,
@@ -216,6 +218,60 @@ def update_task(task_id):
         qr_enabled=qr_enabled
     )
     return jsonify({'ok': True})
+
+
+def _supervisor_get(path, timeout=2):
+    """Call Supervisor API and return parsed JSON, or None on failure/no-token."""
+    token = os.environ.get('SUPERVISOR_TOKEN')
+    if not token:
+        return None
+    try:
+        req = urllib.request.Request(
+            'http://supervisor' + path,
+            headers={'Authorization': f'Bearer {token}'},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read() or '{}')
+    except Exception:
+        return None
+
+
+@app.route('/api/qr-info', methods=['GET'])
+def qr_info():
+    """Return the LAN URL a phone should use to scan QR codes for this add-on.
+
+    Uses the Supervisor API to look up the host's primary IPv4 and whether
+    port 5050 is currently mapped. Returns {available: false} outside HA
+    (e.g. local dev), letting the modal fall back to window.location.origin.
+    """
+    net = _supervisor_get('/network/info')
+    addon = _supervisor_get('/addons/self/info')
+    if net is None and addon is None:
+        return jsonify({'available': False})
+
+    lan_ip = None
+    if net and isinstance(net.get('data'), dict):
+        interfaces = net['data'].get('interfaces') or []
+        primary = next((i for i in interfaces if i.get('primary')), None)
+        if not primary:
+            primary = next((i for i in interfaces if i.get('enabled')), None)
+        if primary:
+            ipv4 = primary.get('ipv4') or {}
+            addrs = ipv4.get('address') or []
+            if addrs:
+                lan_ip = addrs[0].split('/')[0]
+
+    port_5050 = None
+    if addon and isinstance(addon.get('data'), dict):
+        port_map = addon['data'].get('network') or {}
+        port_5050 = port_map.get('5050/tcp')
+
+    return jsonify({
+        'available': True,
+        'lan_ip': lan_ip,
+        'port': port_5050,
+        'port_enabled': bool(port_5050),
+    })
 
 
 @app.route('/q/<int:task_id>/<token>')

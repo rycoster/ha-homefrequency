@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.10.0
+- QR modal now auto-detects the LAN URL your phone should hit — no more editing `http://192.168.x.x:5050` by hand
+- If port 5050 isn't enabled in the add-on's Network settings, the modal shows step-by-step instructions and hides the Print button until the port is available (scanning would 401 otherwise)
+- The "Change URL" panel is still there (collapsed by default) for Nabu Casa or reverse-proxy setups; overrides save to your browser's localStorage
+- Tooltip on the QR toggle now mentions the port-5050 requirement so it's visible before you open the modal
+- New endpoint `/api/qr-info` uses the Supervisor API (`hassio_api: true`) to report the host's LAN IP and current port mapping; falls back to `window.location.origin` outside HA
+
 ## 2.9.1
 - Fix: add-on failed to start on fresh image builds because `gunicorn` was missing from `requirements.txt` (regressed in the 2.6.0 switch away from the Flask dev server; masked until now by a cached image). The 2.9.0 image build surfaced it as `exec: gunicorn: not found` in the restart loop
 

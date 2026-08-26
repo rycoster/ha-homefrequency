@@ -334,7 +334,7 @@ async function loadTasks(highlightId) {
                 <input type="checkbox" class="sensor-toggle" ${task.sensor_enabled ? 'checked' : ''}>
                 <span>HA Sensor</span>
             </label>
-            <label class="sensor-toggle-label qr-toggle-label" title="When on, a scannable QR icon appears on the card. Scanning the printed QR marks this task complete.">
+            <label class="sensor-toggle-label qr-toggle-label" title="When on, a scannable QR icon appears on the card — click it to open a printable code. Scanning the printout marks the task complete.&#10;&#10;Requires port 5050 to be enabled in this add-on's Network settings (opt-in for security). The QR dialog auto-detects and walks you through it.">
                 <input type="checkbox" class="qr-toggle" ${task.qr_enabled ? 'checked' : ''}>
                 <span>QR</span>
             </label>
@@ -1236,22 +1236,16 @@ importFile.addEventListener('change', async (e) => {
 
 // ---------- QR code modal ----------
 
-const QR_BASE_STORAGE_KEY = 'hf_qr_base_url';
+const QR_BASE_STORAGE_KEY = 'hf_qr_base_url_override';
+let qrInfoPromise = null;
 
-function defaultQrBase() {
-    return window.location.origin + (BASE || '');
-}
-
-function getSavedQrBase() {
-    try {
-        return localStorage.getItem(QR_BASE_STORAGE_KEY) || defaultQrBase();
-    } catch {
-        return defaultQrBase();
+function fetchQrInfo() {
+    if (!qrInfoPromise) {
+        qrInfoPromise = fetch(`${BASE}/api/qr-info`)
+            .then(r => r.ok ? r.json() : { available: false })
+            .catch(() => ({ available: false }));
     }
-}
-
-function saveQrBase(value) {
-    try { localStorage.setItem(QR_BASE_STORAGE_KEY, value); } catch {}
+    return qrInfoPromise;
 }
 
 function buildQrUrl(base, taskId, token) {
@@ -1276,7 +1270,7 @@ function renderQrInto(container, text) {
     }
 }
 
-function openQrModal(btn) {
+async function openQrModal(btn) {
     const taskId = btn.dataset.taskId;
     const token = btn.dataset.qrToken;
     const taskName = btn.dataset.taskName;
@@ -1295,14 +1289,7 @@ function openQrModal(btn) {
                 <div class="qr-task-name"></div>
                 <div class="qr-url-preview"></div>
             </div>
-            <div class="qr-controls">
-                <label class="qr-base-label">
-                    Base URL
-                    <input type="url" class="qr-base-input" spellcheck="false" autocomplete="off">
-                </label>
-                <div class="qr-hint qr-hint-normal">Change this if the printed QR needs to work from outside your network. Stored locally.</div>
-                <div class="qr-hint qr-hint-warn">⚠ This looks like a Home Assistant ingress URL. It rotates on each login and the printed QR will stop working. Use a stable URL like <code>http://homeassistant.local:5050</code> instead (enable port 5050 in this add-on's Network settings first).</div>
-            </div>
+            <div class="qr-body"></div>
             <div class="qr-actions">
                 <button type="button" class="qr-btn qr-btn-secondary" data-action="close">Close</button>
                 <button type="button" class="qr-btn qr-btn-primary" data-action="print">Print</button>
@@ -1313,52 +1300,138 @@ function openQrModal(btn) {
     const codeEl = overlay.querySelector('.qr-code');
     const nameEl = overlay.querySelector('.qr-task-name');
     const urlPreviewEl = overlay.querySelector('.qr-url-preview');
-    const baseInput = overlay.querySelector('.qr-base-input');
-    const hintNormal = overlay.querySelector('.qr-hint-normal');
-    const hintWarn = overlay.querySelector('.qr-hint-warn');
+    const bodyEl = overlay.querySelector('.qr-body');
+    const printBtn = overlay.querySelector('[data-action="print"]');
 
     nameEl.textContent = taskName;
-    baseInput.value = getSavedQrBase();
-
-    function refresh() {
-        const url = buildQrUrl(baseInput.value, taskId, token);
-        urlPreviewEl.textContent = url;
-        renderQrInto(codeEl, url);
-        const looksLikeIngress = /\/(?:api\/)?hassio_ingress\//i.test(baseInput.value);
-        hintNormal.style.display = looksLikeIngress ? 'none' : '';
-        hintWarn.style.display = looksLikeIngress ? '' : 'none';
-    }
-    refresh();
-
-    baseInput.addEventListener('input', () => {
-        saveQrBase(baseInput.value);
-        refresh();
-    });
 
     function close() {
         document.body.classList.remove('qr-modal-open');
         overlay.remove();
         document.removeEventListener('keydown', onKey);
     }
-    function onKey(e) {
-        if (e.key === 'Escape') close();
-    }
-
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-    });
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     overlay.querySelector('[data-action="close"]').addEventListener('click', close);
-    overlay.querySelector('[data-action="print"]').addEventListener('click', () => {
+    printBtn.addEventListener('click', () => {
         document.body.classList.add('qr-printing');
         window.print();
         setTimeout(() => document.body.classList.remove('qr-printing'), 500);
     });
-
     document.addEventListener('keydown', onKey);
     document.body.classList.add('qr-modal-open');
     document.body.appendChild(overlay);
+
+    // Show a placeholder while we fetch qr-info
+    bodyEl.innerHTML = '<div class="qr-hint">Loading…</div>';
+
+    const info = await fetchQrInfo();
+    let savedOverride = null;
+    try { savedOverride = localStorage.getItem(QR_BASE_STORAGE_KEY); } catch {}
+
+    // Choose default base URL
+    // Priority: user override (localStorage) > detected LAN URL > current origin fallback
+    let baseUrl;
+    let source; // 'override' | 'auto' | 'fallback'
+    if (savedOverride) {
+        baseUrl = savedOverride;
+        source = 'override';
+    } else if (info.available && info.port_enabled && info.lan_ip && info.port) {
+        baseUrl = `http://${info.lan_ip}:${info.port}`;
+        source = 'auto';
+    } else {
+        baseUrl = window.location.origin + (BASE || '');
+        source = 'fallback';
+    }
+
+    const portClosed = info.available && !info.port_enabled;
+
+    function renderControls() {
+        let html = '';
+        if (portClosed && source !== 'override') {
+            html = `
+                <div class="qr-hint qr-hint-warn">
+                    <strong>Enable port 5050 first.</strong> Printed QR codes reach the add-on directly, not through Home Assistant, so port 5050 needs to be exposed on your network.
+                    <ol class="qr-steps">
+                        <li>Home Assistant → <strong>Settings → Add-ons → HomeFrequency</strong></li>
+                        <li>Open the <strong>Network</strong> section</li>
+                        <li>Set <strong>5050</strong> in the Host box (or click "Ok" to accept the default)</li>
+                        <li>Save — the add-on will restart</li>
+                        <li>Reopen this dialog</li>
+                    </ol>
+                </div>
+                <details class="qr-override-details">
+                    <summary>Use a different URL anyway</summary>
+                    <label class="qr-base-label">
+                        Base URL
+                        <input type="url" class="qr-base-input" spellcheck="false" autocomplete="off" value="${escapeAttr(baseUrl)}">
+                    </label>
+                    <div class="qr-hint">For Nabu Casa or reverse-proxy setups. Saved locally in this browser.</div>
+                </details>
+            `;
+        } else {
+            const detected = source === 'auto';
+            const usingOverride = source === 'override';
+            html = `
+                ${detected ? `<div class="qr-hint qr-hint-ok">✓ Auto-detected LAN URL — scan and go.</div>` : ''}
+                ${usingOverride ? `<div class="qr-hint">Using your saved custom URL. <button type="button" class="qr-reset-btn">Reset to auto</button></div>` : ''}
+                <details class="qr-override-details" ${detected ? '' : 'open'}>
+                    <summary>Change URL</summary>
+                    <label class="qr-base-label">
+                        Base URL
+                        <input type="url" class="qr-base-input" spellcheck="false" autocomplete="off" value="${escapeAttr(baseUrl)}">
+                    </label>
+                    <div class="qr-hint">For Nabu Casa, a reverse proxy, or a different LAN IP. Saved locally in this browser.</div>
+                </details>
+            `;
+        }
+        bodyEl.innerHTML = html;
+
+        const baseInput = bodyEl.querySelector('.qr-base-input');
+        if (baseInput) {
+            baseInput.addEventListener('input', () => {
+                baseUrl = baseInput.value;
+                source = 'override';
+                try { localStorage.setItem(QR_BASE_STORAGE_KEY, baseUrl); } catch {}
+                refreshQr();
+            });
+        }
+        const resetBtn = bodyEl.querySelector('.qr-reset-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                try { localStorage.removeItem(QR_BASE_STORAGE_KEY); } catch {}
+                if (info.available && info.port_enabled && info.lan_ip && info.port) {
+                    baseUrl = `http://${info.lan_ip}:${info.port}`;
+                    source = 'auto';
+                } else {
+                    baseUrl = window.location.origin + (BASE || '');
+                    source = 'fallback';
+                }
+                renderControls();
+                refreshQr();
+            });
+        }
+    }
+
+    function refreshQr() {
+        const url = buildQrUrl(baseUrl, taskId, token);
+        urlPreviewEl.textContent = url;
+        renderQrInto(codeEl, url);
+        // Hide print + preview URL when port is closed and no override — QR would just 401
+        const usable = !portClosed || source === 'override';
+        printBtn.style.display = usable ? '' : 'none';
+        codeEl.style.opacity = usable ? '' : '0.3';
+        urlPreviewEl.style.display = usable ? '' : 'none';
+    }
+
+    renderControls();
+    refreshQr();
 }
 
 window.openQrModal = openQrModal;
 
-document.addEventListener('DOMContentLoaded', loadTasks);
+document.addEventListener('DOMContentLoaded', () => {
+    loadTasks();
+    // Warm the cache so the QR modal opens instantly
+    fetchQrInfo();
+});

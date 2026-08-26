@@ -23,23 +23,40 @@ Simple repeat: every N days, weeks, months, or years. The timer resets each time
 
 ## Features
 
-- Create, edit, delete, snooze, and mark tasks complete
-- Completion history — view, delete, or date-correct past entries
+- Create, edit, delete, and mark tasks complete. Each expanded task has its own Edit button that unlocks inline editing for that card
+- Completion history — view, delete, or date-correct past entries; completions are idempotent per calendar day
 - Notes on any task, with clickable URL support
-- Snooze overdue tasks to the start of the next season
-- Export/Import your task list as JSON
+- Snooze overdue tasks from a duration picker (1 day, 3 days, 1 week, 2 weeks, or 1 month)
+- QR codes per task — print a code that marks the task complete when scanned. Opt-in per task; requires port 5050 to be enabled in Network settings
+- Export/Import your task list as JSON (includes full completion history and QR state)
+- Mobile-friendly UI: touch-friendly targets, native date pickers, stacked layout on phones
 - Light and dark mode (follows system preference)
 
 ## Home Assistant Integration
 
-HomeFrequency automatically installs a custom integration that provides:
+HomeFrequency registers itself via Supervisor discovery — no `configuration.yaml` edit needed. On first start it deploys the custom integration to `/config/custom_components/homefrequency/` and asks HA to restart via a persistent notification. From then on, integration files are redeployed fresh on every add-on start.
 
-- **Per-task sensors** — toggle individually per task; state is days until due, with attributes for schedule type, next due date, notes, and more
+It provides:
+
+- **Per-task sensors** — toggle individually per task; state is days until due
 - **Overdue count sensor** — always active; counts how many tasks are overdue (excludes snoozed)
 - **Completion buttons** — one per sensor-enabled task to mark it complete from HA dashboards or automations
 - **Persistent notifications** — alerts when tasks become overdue, auto-dismisses when caught up
 
-Restart Home Assistant after first install to activate sensors and buttons.
+The sidebar panel is visible to non-admin HA users.
+
+## QR Codes
+
+Print a QR that marks a specific task complete when scanned from your phone camera. Useful for sticking on things like the AC filter or water pitcher.
+
+**Setup:**
+
+1. Enable port **5050** in this add-on's Configuration → Network settings (opt-in for security)
+2. In the app, expand a task, hit **Edit**, and check the **QR** box
+3. Click the small QR icon that appears in the task's meta row to open the print dialog
+4. The dialog auto-detects your LAN URL. Print, stick, scan
+
+Repeat scans on the same day are deduped to one completion. Disabling the QR toggle invalidates any printed codes for that task.
 
 ## Data Storage
 
