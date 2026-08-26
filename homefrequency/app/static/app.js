@@ -1051,12 +1051,39 @@ async function loadTasks(highlightId) {
         const qrToggle = card.querySelector('.qr-toggle');
         if (qrToggle) {
             qrToggle.addEventListener('change', async () => {
+                const enabled = qrToggle.checked;
                 await fetch(`${BASE}/api/tasks/${task.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ qr_enabled: qrToggle.checked })
+                    body: JSON.stringify({ qr_enabled: enabled })
                 });
-                loadTasks(task.id);
+                // Update the meta-row icon in place so the card stays expanded/editing
+                task.qr_enabled = enabled;
+                const metaRow = card.querySelector('.task-meta-row');
+                const existing = metaRow?.querySelector('.qr-icon');
+                if (enabled && !existing) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'qr-icon';
+                    btn.title = 'Print QR code for this task';
+                    btn.dataset.taskId = task.id;
+                    btn.dataset.qrToken = task.qr_token || '';
+                    btn.dataset.taskName = task.name;
+                    btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="#03a9f4" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm2 2h2v2h-2v-2zm-2-4h2v2h-2v-2zm-2 2h2v2h-2v-2z"/></svg>';
+                    btn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        openQrModal(btn);
+                    });
+                    metaRow.appendChild(btn);
+                } else if (!enabled && existing) {
+                    existing.remove();
+                }
+                // Also toggle the footer sheet link, since the enabled count changed
+                const qrSheetBtn = document.getElementById('btn-qr-sheet');
+                if (qrSheetBtn) {
+                    const anyEnabled = !!document.querySelector('.qr-icon');
+                    qrSheetBtn.style.display = anyEnabled ? '' : 'none';
+                }
             });
         }
 

@@ -166,6 +166,40 @@
             text-decoration: none;
         }
         .footer-link:hover { color: #1e6ea8; }
+
+        .close-prompt {
+            margin-top: 16px;
+            padding: 14px 16px;
+            background: #f8f9fb;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .close-prompt p {
+            font-size: 12.5px;
+            color: #6a7384;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+        .btn-close-tab {
+            width: 100%;
+            padding: 12px;
+            background: #0e1525;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .btn-close-tab:active { opacity: 0.85; }
+        .close-fallback {
+            margin-top: 10px;
+            margin-bottom: 0 !important;
+            color: #a67c00 !important;
+        }
     </style>
 </head>
 <body>
@@ -195,6 +229,14 @@
             <div class="banner banner-ok"><span class="mark">✓</span>Marked complete!</div>
         {% elif already_today %}
             <div class="banner banner-info"><span class="mark">✓</span>Already marked complete today.</div>
+        {% endif %}
+
+        {% if just_completed or already_today %}
+            <div class="close-prompt" id="close-prompt">
+                <p>You can close this tab. Leaving it open risks marking this task complete by accident tomorrow.</p>
+                <button type="button" id="btn-close-tab" class="btn-close-tab">Close tab</button>
+                <p class="close-fallback" id="close-fallback" hidden>Your browser wouldn't let this page close itself — please close the tab manually.</p>
+            </div>
         {% endif %}
 
         <div class="info-grid">
@@ -245,5 +287,20 @@
         <a class="footer-link" href="/">Open HomeFrequency</a>
     {% endif %}
     </div>
+    <script>
+        (function () {
+            var btn = document.getElementById('btn-close-tab');
+            if (!btn) return;
+            var fallback = document.getElementById('close-fallback');
+            function tryClose() {
+                try { window.close(); } catch (e) {}
+                // If we're still here 200ms later, the browser refused to close
+                setTimeout(function () {
+                    if (!document.hidden && fallback) fallback.hidden = false;
+                }, 200);
+            }
+            btn.addEventListener('click', tryClose);
+        })();
+    </script>
 </body>
 </html>

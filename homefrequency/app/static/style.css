@@ -440,14 +440,16 @@ button {
 /* Bigger tappable icons when card is expanded */
 .task-card.card-expanded .task-notes-indicator,
 .task-card.card-expanded .task-history-indicator,
-.task-card.card-expanded .sensor-icon {
+.task-card.card-expanded .sensor-icon,
+.task-card.card-expanded .qr-icon {
     font-size: 20px;
     padding: 4px 6px;
     border-radius: 6px;
     background: var(--hover-bg);
 }
 
-.task-card.card-expanded .sensor-icon svg {
+.task-card.card-expanded .sensor-icon svg,
+.task-card.card-expanded .qr-icon svg {
     width: 20px;
     height: 20px;
 }
@@ -1015,29 +1017,13 @@ button {
 }
 
 .sensor-toggle-label {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
     font-size: 0.8rem;
     color: var(--text-secondary);
     cursor: pointer;
     user-select: none;
-    padding: 5px 10px;
-    background: var(--input-bg);
-    border: 1px solid var(--divider);
-    border-radius: 6px;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-
-.sensor-toggle-label:hover {
-    border-color: var(--primary);
-    color: var(--text-primary);
-}
-
-.sensor-toggle-label:has(input:checked) {
-    border-color: var(--primary);
-    color: var(--text-primary);
-    background: color-mix(in srgb, var(--primary) 8%, var(--input-bg));
 }
 
 .sensor-toggle-label input[type="checkbox"] {
@@ -1230,7 +1216,8 @@ button {
     /* Expanded-card indicators approach 44px */
     .task-card.card-expanded .task-notes-indicator,
     .task-card.card-expanded .task-history-indicator,
-    .task-card.card-expanded .sensor-icon {
+    .task-card.card-expanded .sensor-icon,
+    .task-card.card-expanded .qr-icon {
         padding: 10px 12px;
     }
 
@@ -1281,9 +1268,9 @@ button {
 }
 .qr-icon svg { vertical-align: middle; }
 
-/* Space between the HA Sensor and QR chips in the sensor-toggle-row */
+/* Space between the HA Sensor and QR toggles in the sensor-toggle-row */
 .qr-toggle-label {
-    margin-left: 8px;
+    margin-left: 14px;
 }
 
 /* -------- QR modal -------- */
@@ -1492,11 +1479,11 @@ body.qr-modal-open { overflow: hidden; }
         display: none !important;
     }
     body.qr-printing .qr-code {
-        width: 2.4in;
+        width: 1.8in;
         border: none;
         padding: 0;
     }
     body.qr-printing .qr-task-name {
-        font-size: 16pt;
+        font-size: 12pt;
     }
 }

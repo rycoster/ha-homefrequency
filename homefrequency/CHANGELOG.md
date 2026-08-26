@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.11.1
+- Fix: QR icon in a task's meta row now gets the same rounded grey background as the other indicators (notes, history, sensor) when the card is expanded — was floating with no visual container before
+- Fix: toggling the QR checkbox no longer collapses the expanded card (the toggle updates the meta-row icon in place instead of re-rendering the whole task list)
+- Revert: HA Sensor and QR checkboxes are back to plain labels — the chip styling was a misread of what needed the box
+- QR scan → info page adds a "You can close this tab" prompt (with a Close button that tries `window.close()`) after Mark Complete succeeds, so a stale tab left open overnight doesn't invite an accidental re-mark tomorrow. The disabled "Already done today" button is still the primary safety
+- Single-QR printout shrunk another 75% (1.8in wide, 12pt label). Print sheet grid tightened to 4 columns to fit more per page
+
 ## 2.11.0
 - **Scanning a QR no longer auto-completes the task.** It now lands on an info page showing the task name, current status (Overdue / Due today / Due in N days), last completed date + "how long ago", schedule, next due date, and recent completions. A big **Mark Complete** button is the only thing that records a completion — no side effects from just scanning
 - After pressing Mark Complete the page reloads with a "✓ Marked complete!" banner and the button greys out ("Already done today") so a follow-up scan can't double-log
