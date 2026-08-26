@@ -1,7 +1,12 @@
 import sqlite3
 import os
+import secrets
 from datetime import datetime, timedelta, date
 import calendar
+
+
+def _new_qr_token():
+    return secrets.token_urlsafe(12)
 
 DB_DIR = os.environ.get('DB_DIR', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data'))
 DB_PATH = os.path.join(DB_DIR, 'tasks.db')
@@ -39,6 +44,17 @@ def init_db():
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN snoozed_until TIMESTAMP")
     if 'sensor_enabled' not in cols:
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN sensor_enabled INTEGER DEFAULT 0")
+    if 'qr_token' not in cols:
+        conn.execute("ALTER TABLE recurring_tasks ADD COLUMN qr_token TEXT")
+    if 'qr_enabled' not in cols:
+        conn.execute("ALTER TABLE recurring_tasks ADD COLUMN qr_enabled INTEGER DEFAULT 0")
+    # Backfill qr_token for any rows missing one (existing or newly-migrated)
+    missing = conn.execute(
+        "SELECT id FROM recurring_tasks WHERE qr_token IS NULL OR qr_token = ''"
+    ).fetchall()
+    for row in missing:
+        conn.execute('UPDATE recurring_tasks SET qr_token = ? WHERE id = ?',
+                     (_new_qr_token(), row[0]))
     conn.execute('''
         CREATE TABLE IF NOT EXISTS task_completions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,10 +158,10 @@ def add_task(name, frequency_days=0, schedule_type='interval',
     snoozed_until = (datetime.now() + timedelta(days=7)).isoformat() if schedule_type == 'dynamic' else None
     cur = conn.execute(
         '''INSERT INTO recurring_tasks
-           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed, sensor_enabled, snoozed_until)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed, sensor_enabled, snoozed_until, qr_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes,
-         last_completed, 1 if sensor_enabled else 0, snoozed_until)
+         last_completed, 1 if sensor_enabled else 0, snoozed_until, _new_qr_token())
     )
     task_id = cur.lastrowid
     conn.commit()
@@ -154,8 +170,23 @@ def add_task(name, frequency_days=0, schedule_type='interval',
 
 
 def complete_task(task_id, completed_at=None):
+    """Record a completion. Idempotent per calendar day: if a completion for
+    this task already exists on the same day, this is a no-op.
+
+    Returns True if a new completion was recorded, False if deduped.
+    """
     conn = get_db()
     ts = completed_at if completed_at else datetime.now().isoformat()
+    parsed = _parse_ts(ts)
+    ts_date = parsed.date().isoformat() if parsed else None
+    if ts_date:
+        existing = conn.execute(
+            "SELECT id FROM task_completions WHERE task_id = ? AND date(completed_at) = ? LIMIT 1",
+            (task_id, ts_date)
+        ).fetchone()
+        if existing:
+            conn.close()
+            return False
     conn.execute(
         'UPDATE recurring_tasks SET last_completed = ? WHERE id = ?',
         (ts, task_id)
@@ -166,6 +197,20 @@ def complete_task(task_id, completed_at=None):
     )
     conn.commit()
     conn.close()
+    return True
+
+
+def find_task_by_qr(task_id, token):
+    """Return task row as dict if id+token match and token is non-empty, else None."""
+    if not token:
+        return None
+    conn = get_db()
+    row = conn.execute(
+        'SELECT * FROM recurring_tasks WHERE id = ? AND qr_token = ?',
+        (task_id, token)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def get_completions_by_task(conn):
@@ -227,7 +272,7 @@ def delete_task(task_id):
 
 def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
               fixed_unit=None, fixed_value=None, notes=None, snoozed_until=None,
-              sensor_enabled=None):
+              sensor_enabled=None, qr_enabled=None):
     conn = get_db()
     if name is not None:
         conn.execute('UPDATE recurring_tasks SET name = ? WHERE id = ?', (name, task_id))
@@ -248,6 +293,9 @@ def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
     if sensor_enabled is not None:
         conn.execute('UPDATE recurring_tasks SET sensor_enabled = ? WHERE id = ?',
                      (1 if sensor_enabled else 0, task_id))
+    if qr_enabled is not None:
+        conn.execute('UPDATE recurring_tasks SET qr_enabled = ? WHERE id = ?',
+                     (1 if qr_enabled else 0, task_id))
     conn.commit()
     conn.close()
 
@@ -349,6 +397,7 @@ def get_all_tasks():
     for row in rows:
         task = dict(row)
         task['sensor_enabled'] = bool(task.get('sensor_enabled'))
+        task['qr_enabled'] = bool(task.get('qr_enabled'))
         stype = task.get('schedule_type') or 'interval'
         task['completions'] = completions_by_task.get(task['id'], [])
 

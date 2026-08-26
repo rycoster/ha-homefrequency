@@ -2,7 +2,8 @@ import os
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from models import (init_db, add_task, complete_task, delete_task, edit_task,
-                     get_all_tasks, delete_completion, edit_completion)
+                     get_all_tasks, delete_completion, edit_completion,
+                     find_task_by_qr)
 
 app = Flask(__name__)
 init_db()
@@ -70,8 +71,8 @@ def mark_complete(task_id):
     completed_at = data.get('completed_at')
     if completed_at is not None and not _valid_iso(completed_at):
         return jsonify({'error': 'completed_at must be an ISO timestamp'}), 400
-    complete_task(task_id, completed_at=completed_at)
-    return jsonify({'ok': True})
+    recorded = complete_task(task_id, completed_at=completed_at)
+    return jsonify({'ok': True, 'deduped': not recorded})
 
 
 @app.route('/api/tasks/<int:task_id>/snooze', methods=['POST'])
@@ -138,6 +139,7 @@ def export_tasks():
             'last_completed': t.get('last_completed'),
             'snoozed_until': t.get('snoozed_until'),
             'sensor_enabled': t.get('sensor_enabled', False),
+            'qr_enabled': t.get('qr_enabled', False),
             'completions': [c['completed_at'] for c in t.get('completions', [])],
         })
     return jsonify(export)
@@ -189,6 +191,8 @@ def import_tasks():
             # Restore the exported snooze state, clearing any default snooze
             # add_task applies to dynamic tasks.
             edit_task(task_id, snoozed_until=t['snoozed_until'] or '')
+        if t.get('qr_enabled'):
+            edit_task(task_id, qr_enabled=True)
         count += 1
     return jsonify({'ok': True, 'imported': count}), 201
 
@@ -199,6 +203,7 @@ def update_task(task_id):
     freq = data.get('frequency_days')
     notes = data.get('notes')
     sensor_enabled = data.get('sensor_enabled')
+    qr_enabled = data.get('qr_enabled')
     edit_task(
         task_id,
         name=data.get('name'),
@@ -207,9 +212,24 @@ def update_task(task_id):
         fixed_unit=data.get('fixed_unit'),
         fixed_value=int(data['fixed_value']) if data.get('fixed_value') is not None else None,
         notes=notes,
-        sensor_enabled=sensor_enabled
+        sensor_enabled=sensor_enabled,
+        qr_enabled=qr_enabled
     )
     return jsonify({'ok': True})
+
+
+@app.route('/q/<int:task_id>/<token>')
+def qr_complete(task_id, token):
+    task = find_task_by_qr(task_id, token)
+    if not task or not task.get('qr_enabled'):
+        return render_template('qr_result.html', ok=False, task_name=None,
+                               message='This QR code is not active for this task.'), 404
+    recorded = complete_task(task_id)
+    if recorded:
+        return render_template('qr_result.html', ok=True, task_name=task['name'],
+                               message='Marked complete.', deduped=False)
+    return render_template('qr_result.html', ok=True, task_name=task['name'],
+                           message='Already marked complete today.', deduped=True)
 
 
 if __name__ == '__main__':

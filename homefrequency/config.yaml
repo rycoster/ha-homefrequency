@@ -1,6 +1,6 @@
 name: HomeFrequency
 description: Recurring task tracker
-version: 2.8.0
+version: 2.9.0
 slug: homefrequency
 arch:
   - amd64
@@ -17,5 +17,10 @@ hassio_api: true
 homeassistant_api: true
 discovery:
   - homefrequency
+# Direct-port access is opt-in (null = user configures in add-on's Network
+# panel). Only needed for printed QR codes to work from phones — everything
+# else runs through ingress.
+ports:
+  "5050/tcp": null
 map:
   - config:rw

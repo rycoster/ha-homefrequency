@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.9.0
+- New: QR codes per task. Turn on the QR toggle in a task's edit view (alongside HA Sensor) and a scannable QR icon appears on the card next to the house icon. Click the icon to open a printable modal — scan the printout with a phone camera to mark the task complete instantly.
+- QR is off by default per task. Disabling the QR toggle removes the icon and invalidates any printed codes for that task.
+- Each task gets its own random QR token, auto-generated on creation and backfilled for existing tasks on upgrade. Anyone with a printout for an active task can trigger a completion, so treat printouts as trusted.
+- QR modal has an editable base URL, saved to your browser's localStorage. Point it at whatever URL your phone can actually reach the add-on from. Ingress URLs will not work — they rotate on each login; the modal warns you if it detects one.
+- The direct-port mapping (5050/tcp) is back, still opt-in — enable it in the add-on's Network settings before the LAN URL (e.g. `http://homeassistant.local:5050`) will resolve from a phone. Users who don't use QR keep the ingress-only defaults from 2.6.0.
+- Behavior change: task completions are now idempotent per calendar day, everywhere. Pressing Reset (or scanning a QR) more than once on the same day records exactly one completion. Manually editing or backfilling completion dates is unaffected. `/api/tasks/<id>/complete` now returns `{ok, deduped}`.
+- QR-enabled state is included in export/import.
+
 ## 2.8.0
 - Editing is now per-card instead of a global mode: each expanded card has its own Edit button that unlocks editing (name, schedule, dates, notes, history, HA sensor toggle, Undo, Delete) for that card only
 - The global Edit toggle and page-wide blue glow are gone; the card being edited gets a blue outline instead

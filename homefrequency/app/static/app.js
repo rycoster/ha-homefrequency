@@ -301,6 +301,9 @@ async function loadTasks(highlightId) {
         const hasHistory = task.completions && task.completions.length > 0;
         const notesOpen = hasNotes && (days <= 7 || days < 0);
         const sensorIcon = task.sensor_enabled ? '<span class="sensor-icon" title="HA sensor enabled"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#03a9f4" d="M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z"/></svg></span>' : '';
+        const qrIcon = task.qr_enabled
+            ? `<button type="button" class="qr-icon" title="Print QR code for this task" data-task-id="${task.id}" data-qr-token="${task.qr_token || ''}" data-task-name="${escapeAttr(task.name)}" onclick="openQrModal(this); event.stopPropagation();"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="#03a9f4" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm2 2h2v2h-2v-2zm-2-4h2v2h-2v-2zm-2 2h2v2h-2v-2z"/></svg></button>`
+            : '';
         const indicatorHtml = `<span class="task-notes-indicator${hasNotes ? ' has-notes' : ''}" role="button" aria-label="${hasNotes ? 'View notes' : 'Add notes'}" title="${hasNotes ? 'View notes' : 'Add notes'}">&#128172;</span>`;
         const historyIndicatorHtml = `<span class="task-history-indicator${hasHistory ? ' has-history' : ''}" role="button" aria-label="Completion history" title="Completion history">&#128337;</span>`;
 
@@ -331,6 +334,10 @@ async function loadTasks(highlightId) {
                 <input type="checkbox" class="sensor-toggle" ${task.sensor_enabled ? 'checked' : ''}>
                 <span>HA Sensor</span>
             </label>
+            <label class="sensor-toggle-label qr-toggle-label" title="When on, a scannable QR icon appears on the card. Scanning the printed QR marks this task complete.">
+                <input type="checkbox" class="qr-toggle" ${task.qr_enabled ? 'checked' : ''}>
+                <span>QR</span>
+            </label>
         </div>`;
 
         card.innerHTML = `
@@ -341,6 +348,7 @@ async function loadTasks(highlightId) {
                     ${historyIndicatorHtml}
                     ${indicatorHtml}
                     ${sensorIcon}
+                    ${qrIcon}
                 </div>
                 ${notesHtml}
                 ${sensorHtml}
@@ -1032,6 +1040,18 @@ async function loadTasks(highlightId) {
             });
         }
 
+        const qrToggle = card.querySelector('.qr-toggle');
+        if (qrToggle) {
+            qrToggle.addEventListener('change', async () => {
+                await fetch(`${BASE}/api/tasks/${task.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qr_enabled: qrToggle.checked })
+                });
+                loadTasks(task.id);
+            });
+        }
+
         taskList.appendChild(card);
 
         if (highlightId && task.id === highlightId) {
@@ -1166,6 +1186,10 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;');
+}
+
 function linkifyText(escapedHtml) {
     return escapedHtml.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 }
@@ -1209,5 +1233,132 @@ importFile.addEventListener('change', async (e) => {
     }
     importFile.value = '';
 });
+
+// ---------- QR code modal ----------
+
+const QR_BASE_STORAGE_KEY = 'hf_qr_base_url';
+
+function defaultQrBase() {
+    return window.location.origin + (BASE || '');
+}
+
+function getSavedQrBase() {
+    try {
+        return localStorage.getItem(QR_BASE_STORAGE_KEY) || defaultQrBase();
+    } catch {
+        return defaultQrBase();
+    }
+}
+
+function saveQrBase(value) {
+    try { localStorage.setItem(QR_BASE_STORAGE_KEY, value); } catch {}
+}
+
+function buildQrUrl(base, taskId, token) {
+    const trimmed = (base || '').replace(/\/+$/, '');
+    return `${trimmed}/q/${taskId}/${encodeURIComponent(token)}`;
+}
+
+function renderQrInto(container, text) {
+    container.innerHTML = '';
+    if (!text || typeof qrcode !== 'function') return;
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    container.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+    const svg = container.querySelector('svg');
+    if (svg) {
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        svg.style.width = '100%';
+        svg.style.height = 'auto';
+        svg.style.shapeRendering = 'crispEdges';
+    }
+}
+
+function openQrModal(btn) {
+    const taskId = btn.dataset.taskId;
+    const token = btn.dataset.qrToken;
+    const taskName = btn.dataset.taskName;
+
+    if (!token) {
+        alert('This task has no QR token yet — reload the page.');
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'qr-overlay';
+    overlay.innerHTML = `
+        <div class="qr-modal" role="dialog" aria-modal="true">
+            <div class="qr-print-area">
+                <div class="qr-code"></div>
+                <div class="qr-task-name"></div>
+                <div class="qr-url-preview"></div>
+            </div>
+            <div class="qr-controls">
+                <label class="qr-base-label">
+                    Base URL
+                    <input type="url" class="qr-base-input" spellcheck="false" autocomplete="off">
+                </label>
+                <div class="qr-hint qr-hint-normal">Change this if the printed QR needs to work from outside your network. Stored locally.</div>
+                <div class="qr-hint qr-hint-warn">⚠ This looks like a Home Assistant ingress URL. It rotates on each login and the printed QR will stop working. Use a stable URL like <code>http://homeassistant.local:5050</code> instead (enable port 5050 in this add-on's Network settings first).</div>
+            </div>
+            <div class="qr-actions">
+                <button type="button" class="qr-btn qr-btn-secondary" data-action="close">Close</button>
+                <button type="button" class="qr-btn qr-btn-primary" data-action="print">Print</button>
+            </div>
+        </div>
+    `;
+
+    const codeEl = overlay.querySelector('.qr-code');
+    const nameEl = overlay.querySelector('.qr-task-name');
+    const urlPreviewEl = overlay.querySelector('.qr-url-preview');
+    const baseInput = overlay.querySelector('.qr-base-input');
+    const hintNormal = overlay.querySelector('.qr-hint-normal');
+    const hintWarn = overlay.querySelector('.qr-hint-warn');
+
+    nameEl.textContent = taskName;
+    baseInput.value = getSavedQrBase();
+
+    function refresh() {
+        const url = buildQrUrl(baseInput.value, taskId, token);
+        urlPreviewEl.textContent = url;
+        renderQrInto(codeEl, url);
+        const looksLikeIngress = /\/(?:api\/)?hassio_ingress\//i.test(baseInput.value);
+        hintNormal.style.display = looksLikeIngress ? 'none' : '';
+        hintWarn.style.display = looksLikeIngress ? '' : 'none';
+    }
+    refresh();
+
+    baseInput.addEventListener('input', () => {
+        saveQrBase(baseInput.value);
+        refresh();
+    });
+
+    function close() {
+        document.body.classList.remove('qr-modal-open');
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) {
+        if (e.key === 'Escape') close();
+    }
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+    });
+    overlay.querySelector('[data-action="close"]').addEventListener('click', close);
+    overlay.querySelector('[data-action="print"]').addEventListener('click', () => {
+        document.body.classList.add('qr-printing');
+        window.print();
+        setTimeout(() => document.body.classList.remove('qr-printing'), 500);
+    });
+
+    document.addEventListener('keydown', onKey);
+    document.body.classList.add('qr-modal-open');
+    document.body.appendChild(overlay);
+}
+
+window.openQrModal = openQrModal;
 
 document.addEventListener('DOMContentLoaded', loadTasks);

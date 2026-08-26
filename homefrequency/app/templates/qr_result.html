@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if ok %}✓ {{ task_name }}{% else %}QR error{% endif %} — HomeFrequency</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f6f8;
+            color: #1a1f2c;
+        }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 48px 32px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        }
+        .mark {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 56px;
+            line-height: 1;
+        }
+        .mark.ok { background: #e7f7ed; color: #1e9e51; }
+        .mark.dedup { background: #fff4d6; color: #a67c00; }
+        .mark.err { background: #fde8e8; color: #c53030; }
+        h1 {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 40px;
+            letter-spacing: 0.03em;
+            margin-bottom: 8px;
+            line-height: 1.05;
+        }
+        .msg { color: #6a7384; font-size: 15px; margin-bottom: 24px; }
+        .stamp { color: #9aa2b1; font-size: 13px; margin-bottom: 24px; }
+        a.back {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #0e1525;
+            color: #fff;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        {% if ok and not deduped %}
+            <div class="mark ok">✓</div>
+            <h1>{{ task_name }}</h1>
+            <div class="msg">{{ message }}</div>
+            <div class="stamp" id="stamp"></div>
+        {% elif ok and deduped %}
+            <div class="mark dedup">✓</div>
+            <h1>{{ task_name }}</h1>
+            <div class="msg">{{ message }}</div>
+        {% else %}
+            <div class="mark err">!</div>
+            <h1>QR error</h1>
+            <div class="msg">{{ message }}</div>
+        {% endif %}
+        <a class="back" href="/">Open HomeFrequency</a>
+    </div>
+    <script>
+        (function () {
+            var el = document.getElementById('stamp');
+            if (!el) return;
+            var d = new Date();
+            el.textContent = d.toLocaleString();
+        })();
+    </script>
+</body>
+</html>

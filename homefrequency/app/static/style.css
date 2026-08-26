@@ -1214,3 +1214,195 @@ button {
         padding: 6px 2px;
     }
 }
+
+/* -------- QR icon (meta row, shown when qr_enabled) -------- */
+.qr-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 2px;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+.qr-icon:hover {
+    opacity: 1;
+    transform: scale(1.08);
+}
+.qr-icon svg { vertical-align: middle; }
+
+/* QR checkbox sits alongside HA Sensor in the sensor-toggle-row */
+.qr-toggle-label {
+    margin-left: 14px;
+}
+
+/* -------- QR modal -------- */
+.qr-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 21, 37, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+    animation: qr-fade 0.15s ease-out;
+}
+@keyframes qr-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+body.qr-modal-open { overflow: hidden; }
+
+.qr-modal {
+    background: var(--card-bg);
+    border-radius: 16px;
+    max-width: 420px;
+    width: 100%;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-height: 90vh;
+    overflow-y: auto;
+    color: var(--text-primary);
+}
+.qr-print-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.qr-code {
+    width: 260px;
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #fff;
+    padding: 8px;
+    border: 1px solid var(--divider);
+    border-radius: 8px;
+}
+.qr-code svg { display: block; }
+.qr-task-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 0.03em;
+    text-align: center;
+    color: var(--text-primary);
+    line-height: 1.1;
+    word-break: break-word;
+}
+.qr-url-preview {
+    font-family: -apple-system, BlinkMacSystemFont, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: center;
+    word-break: break-all;
+    max-width: 300px;
+}
+.qr-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.qr-base-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.qr-base-input {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--divider);
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--input-bg);
+    color: var(--text-primary);
+}
+.qr-base-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--card-bg);
+}
+.qr-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.75;
+    line-height: 1.4;
+}
+.qr-hint-warn {
+    color: #a67c00;
+    background: #fff4d6;
+    border-radius: 6px;
+    padding: 8px 10px;
+    opacity: 1;
+}
+.qr-hint-warn code {
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10.5px;
+}
+.qr-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+.qr-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, background 0.2s;
+}
+.qr-btn-primary { background: var(--primary); color: #fff; }
+.qr-btn-primary:hover { opacity: 0.9; }
+.qr-btn-secondary { background: var(--hover-bg); color: var(--text-secondary); }
+.qr-btn-secondary:hover { background: var(--divider); }
+
+/* -------- Print: only the QR + label -------- */
+@media print {
+    body.qr-printing * { visibility: hidden !important; }
+    body.qr-printing .qr-overlay,
+    body.qr-printing .qr-overlay * { visibility: visible !important; }
+    body.qr-printing .qr-overlay {
+        position: fixed;
+        inset: 0;
+        background: #fff !important;
+        padding: 0;
+        display: block;
+    }
+    body.qr-printing .qr-modal {
+        box-shadow: none;
+        max-width: none;
+        max-height: none;
+        padding: 24px;
+        border-radius: 0;
+        gap: 12px;
+    }
+    body.qr-printing .qr-controls,
+    body.qr-printing .qr-actions,
+    body.qr-printing .qr-hint,
+    body.qr-printing .qr-url-preview {
+        display: none !important;
+    }
+    body.qr-printing .qr-code {
+        width: 3.2in;
+        border: none;
+        padding: 0;
+    }
+    body.qr-printing .qr-task-name {
+        font-size: 22pt;
+    }
+}
