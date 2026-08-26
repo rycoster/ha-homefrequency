@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.9.1
+- Fix: add-on failed to start on fresh image builds because `gunicorn` was missing from `requirements.txt` (regressed in the 2.6.0 switch away from the Flask dev server; masked until now by a cached image). The 2.9.0 image build surfaced it as `exec: gunicorn: not found` in the restart loop
+
 ## 2.9.0
 - New: QR codes per task. Turn on the QR toggle in a task's edit view (alongside HA Sensor) and a scannable QR icon appears on the card next to the house icon. Click the icon to open a printable modal — scan the printout with a phone camera to mark the task complete instantly.
 - QR is off by default per task. Disabling the QR toggle removes the icon and invalidates any printed codes for that task.
