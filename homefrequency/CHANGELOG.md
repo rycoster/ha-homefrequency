@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.11.2
+- Fix: when `/api/tasks` fails (e.g. HTTP 401/403 because the signed-in HA user isn't allowed to reach the add-on), the app now shows a visible red error banner explaining the failure and how to fix it — instead of silently rendering an empty task list
+
 ## 2.11.1
 - Fix: QR icon in a task's meta row now gets the same rounded grey background as the other indicators (notes, history, sensor) when the card is expanded — was floating with no visual container before
 - Fix: toggling the QR checkbox no longer collapses the expanded card (the toggle updates the meta-row icon in place instead of re-rendering the whole task list)

@@ -151,6 +151,27 @@ button {
     font-style: italic;
 }
 
+.load-error {
+    margin: 12px 0;
+    padding: 14px 16px;
+    background: #fbe9e7;
+    color: #b71c1c;
+    border-left: 4px solid var(--error);
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+.load-error-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+    color: #7a1a1a;
+}
+@media (prefers-color-scheme: dark) {
+    .load-error { background: rgba(239, 83, 80, 0.15); color: #ffcdd2; }
+    .load-error-hint { color: #ef9a9a; }
+}
+
 /* Add Task Form */
 .add-task.open {
     display: flex;

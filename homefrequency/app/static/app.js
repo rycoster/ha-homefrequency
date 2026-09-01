@@ -220,8 +220,19 @@ const BUCKET_LABELS = {
 };
 
 async function loadTasks(highlightId) {
-    const res = await fetch(`${BASE}/api/tasks`);
-    const tasks = await res.json();
+    let tasks;
+    try {
+        const res = await fetch(`${BASE}/api/tasks`);
+        if (!res.ok) {
+            throw new Error(`API returned HTTP ${res.status} ${res.statusText}`);
+        }
+        tasks = await res.json();
+    } catch (err) {
+        console.error('[HomeFrequency] loadTasks failed:', err);
+        showLoadError(err);
+        return;
+    }
+    clearLoadError();
 
     // Show the Print QR sheet link only when at least one task has QR enabled
     const qrSheetBtn = document.getElementById('btn-qr-sheet');
@@ -1098,6 +1109,32 @@ async function loadTasks(highlightId) {
     // Re-apply any active filter after re-render, then restore scroll
     applyTaskFilter();
     if (!highlightId) taskList.scrollTop = prevScroll;
+}
+
+function showLoadError(err) {
+    let banner = document.getElementById('load-error');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'load-error';
+        banner.className = 'load-error';
+        taskList.parentNode.insertBefore(banner, taskList);
+    }
+    const msg = (err && err.message) ? err.message : String(err);
+    const hint = /HTTP 40[13]/.test(msg)
+        ? "This usually means the signed-in Home Assistant user isn't allowed to reach the add-on. Try signing out/in, or (temporarily) grant the user Local admin in HA → Settings → People."
+        : "Check the add-on is running and reachable.";
+    banner.innerHTML = `<strong>Couldn't load tasks.</strong> ${escapeHtml(msg)}<br><span class="load-error-hint">${escapeHtml(hint)}</span>`;
+}
+
+function clearLoadError() {
+    const banner = document.getElementById('load-error');
+    if (banner) banner.remove();
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
 }
 
 function applyTaskFilter() {
