@@ -2,7 +2,7 @@ import os
 import json
 import urllib.request
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, make_response
 from models import (init_db, add_task, complete_task, delete_task, edit_task,
                      get_all_tasks, delete_completion, edit_completion,
                      find_task_by_qr, normalize_fixed, set_archived)
@@ -29,7 +29,10 @@ def allow_iframe(response):
 @app.route('/')
 def index():
     ingress_path = request.headers.get('X-Ingress-Path', '')
-    return render_template('index.html', ingress_path=ingress_path)
+    response = make_response(render_template('index.html', ingress_path=ingress_path))
+    # Always fetch a fresh page so it never points at stale script versions
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
 
 
 @app.route('/api/tasks', methods=['GET'])

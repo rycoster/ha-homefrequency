@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.13.2
+- Fix attempt: the task list could stay blank (no header, no error) in the Companion app. The page is no longer cached, so it can't point at stale scripts, and the app now starts even if the page finished loading before the script ran
+- Script errors now show as a red banner on the page, so problems on phones (which have no console) are visible
+- HF mark: lighter Demi Bold letters, square corners on the cut-out around them, no stray roof tips or light edge pixels. The icon is now drawn in code at 2x and scaled down, so every size is crisp
+
 ## 2.13.1
 - The H [clock-house] F mark is now used everywhere except the in-app header: Add-on Store icon, integration icon, add-on page logo, and the QR landing page / print sheet
 

@@ -8,10 +8,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/style.css?v=2.13.1">
+    <link rel="stylesheet" href="static/style.css?v=2.13.2">
 </head>
 <body>
-    <script>const BASE_PATH = "{{ ingress_path }}";</script>
+    <script>
+        const BASE_PATH = "{{ ingress_path }}";
+        // Show script errors on the page: phones have no console to check
+        function showScriptError(msg) {
+            const box = document.createElement('div');
+            box.className = 'load-error';
+            box.textContent = 'Script error: ' + msg;
+            (document.querySelector('.container') || document.body).prepend(box);
+        }
+        window.addEventListener('error', e => {
+            if (e.message) showScriptError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})`);
+            else if (e.target && e.target.tagName === 'SCRIPT') showScriptError(`couldn't load ${e.target.src}`);
+        }, true);
+        window.addEventListener('unhandledrejection', e => showScriptError(String(e.reason)));
+    </script>
     <div class="container">
         <div class="top-bar">
             <button id="add-task-toggle" class="add-task-toggle">+ New Task</button>
@@ -42,14 +56,14 @@
         </form>
         <div id="task-list" class="task-list"></div>
         <div class="data-tools">
-            <span class="version-label">v2.13.1</span>
+            <span class="version-label">v2.13.2</span>
             <a id="btn-qr-sheet" class="data-btn" href="qr-sheet" target="_blank" rel="noopener" title="Open a printable sheet of all tasks with QR enabled">Print QR sheet</a>
             <button id="btn-export" class="data-btn">Export</button>
             <button id="btn-import" class="data-btn">Import</button>
             <input type="file" id="import-file" accept=".json" style="display:none;">
         </div>
     </div>
-    <script src="static/vendor/qrcode.min.js?v=2.13.1"></script>
-    <script src="static/app.js?v=2.13.1"></script>
+    <script src="static/vendor/qrcode.min.js?v=2.13.2"></script>
+    <script src="static/app.js?v=2.13.2"></script>
 </body>
 </html>

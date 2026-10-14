@@ -1624,8 +1624,15 @@ async function openQrModal(btn) {
 
 window.openQrModal = openQrModal;
 
-document.addEventListener('DOMContentLoaded', () => {
+function startApp() {
     loadTasks();
     // Warm the cache so the QR modal opens instantly
     fetchQrInfo();
-});
+}
+
+// The page may already be parsed by the time this runs
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startApp);
+} else {
+    startApp();
+}
