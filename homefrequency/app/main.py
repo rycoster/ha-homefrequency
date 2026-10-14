@@ -2,7 +2,7 @@ import os
 import json
 import urllib.request
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, make_response
+from flask import Flask, render_template, request, jsonify, make_response, send_from_directory
 from models import (init_db, add_task, complete_task, delete_task, edit_task,
                      get_all_tasks, delete_completion, edit_completion,
                      find_task_by_qr, normalize_fixed, set_archived)
@@ -33,6 +33,14 @@ def index():
     # Always fetch a fresh page so it never points at stale script versions
     response.headers['Cache-Control'] = 'no-cache'
     return response
+
+
+@app.route('/v/<version>/<path:filename>')
+def versioned_static(version, filename):
+    """Static files under a versioned path. The HA app's cache ignores ?v=
+    query strings and kept serving an old app.js, so the version goes in the
+    path instead, where no cache can ignore it."""
+    return send_from_directory(app.static_folder, filename)
 
 
 @app.route('/api/tasks', methods=['GET'])

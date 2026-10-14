@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.13.3
+- Fix: blank task list in the Companion app. The app's cache ignored the `?v=` version tag and kept serving an old app.js (from 2.11), which crashed on the new page. Scripts and styles now load from a versioned path (`v/<version>/app.js`), so an update always fetches fresh files
+
 ## 2.13.2
 - Fix attempt: the task list could stay blank (no header, no error) in the Companion app. The page is no longer cached, so it can't point at stale scripts, and the app now starts even if the page finished loading before the script ran
 - Script errors now show as a red banner on the page, so problems on phones (which have no console) are visible
