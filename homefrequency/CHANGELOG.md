@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.13.1
+- The H [clock-house] F mark is now used everywhere except the in-app header: Add-on Store icon, integration icon, add-on page logo, and the QR landing page / print sheet
+
 ## 2.13.0
 - After **Reset**, a toast gives you 5 seconds to say when you actually did it: **Yesterday**, **2 days ago**, **Pick date…**, or **Undo**. Tapping one moves that completion to the chosen day. Touching the toast pauses the countdown; ignoring it keeps "done now"
 - QR scan landing page and printable QR sheet now show the clock-house logo
