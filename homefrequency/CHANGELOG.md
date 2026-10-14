@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.12.1
+- Add-on page logo is now a compact "H [clock-house] F" mark in sky blue, with the letters cut out of the house walls. The wide icon + wordmark logo was shown too small to read, and its navy text vanished on HA's dark theme
+
 ## 2.12.0
 - Fixed schedules are now multi-select: **Weekly** lets you pick several days (e.g. Mon, Wed, Fri) and **Monthly** lets you pick a day of the month plus which months (e.g. the 15th of Apr & Oct for a twice-a-year task). Completions still count toward the nearest scheduled date, so finishing a few days early or late never shifts the schedule
 - Yearly fixed tasks are migrated automatically to Monthly with a single month selected
