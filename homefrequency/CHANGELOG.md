@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.12.0
+- Fixed schedules are now multi-select: **Weekly** lets you pick several days (e.g. Mon, Wed, Fri) and **Monthly** lets you pick a day of the month plus which months (e.g. the 15th of Apr & Oct for a twice-a-year task). Completions still count toward the nearest scheduled date, so finishing a few days early or late never shifts the schedule
+- Yearly fixed tasks are migrated automatically to Monthly with a single month selected
+- New fixed tasks no longer record an implicit completion at creation -- that completion was credited to the upcoming date and skipped it (e.g. a new "Dec 25" task showed as due next year)
+- Interval tasks set in months/years now keep the same day of the month (6 months from Apr 15 is Oct 15, not Oct 12)
+- **Archive**: a task's Delete button is now Archive. Archived tasks drop out of the list (and their HA sensor / QR code go inactive) but keep their history; restore or permanently delete them from the new "Archived" section at the bottom of the list
+- Export/import include archived tasks and the multi-select fixed schedules
+- New logo: a clock-house whose hands form a checkmark, with a geometric "HOME FREQUENCY" wordmark. Used for the add-on store icon/logo (plus a new `dark_logo.png` for HA dark theme), the integration icon and the in-app header. Brand assets (colour / black / white) are rebuilt from `icons/build_brand.py`
+
 ## 2.11.2
 - Fix: when `/api/tasks` fails (e.g. HTTP 401/403 because the signed-in HA user isn't allowed to reach the add-on), the app now shows a visible red error banner explaining the failure and how to fix it — instead of silently rendering an empty task list
 

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from models import (init_db, add_task, complete_task, delete_task, edit_task,
                      get_all_tasks, delete_completion, edit_completion,
-                     find_task_by_qr)
+                     find_task_by_qr, normalize_fixed, set_archived)
 
 app = Flask(__name__)
 init_db()
@@ -58,12 +58,14 @@ def create_task():
         task_id = add_task(name, frequency_days=0, schedule_type='dynamic', notes=notes)
         complete_task(task_id)
     elif schedule_type == 'fixed':
-        fixed_unit = data.get('fixed_unit')
-        fixed_value = data.get('fixed_value')
-        if not fixed_unit or fixed_value is None:
-            return jsonify({'error': 'Fixed schedule requires unit and value'}), 400
+        try:
+            fixed_unit, fixed_value, fixed_set = normalize_fixed(
+                data.get('fixed_unit'), data.get('fixed_value'), data.get('fixed_set'))
+        except (TypeError, ValueError) as err:
+            return jsonify({'error': f'Invalid fixed schedule: {err}'}), 400
         task_id = add_task(name, frequency_days=0, schedule_type='fixed',
-                          fixed_unit=fixed_unit, fixed_value=int(fixed_value), notes=notes)
+                          fixed_unit=fixed_unit, fixed_value=fixed_value,
+                          fixed_set=fixed_set, notes=notes)
     else:
         frequency_days = data.get('frequency_days')
         if not frequency_days:
@@ -132,9 +134,28 @@ def remove_task(task_id):
     return jsonify({'ok': True})
 
 
+@app.route('/api/tasks/archived', methods=['GET'])
+def list_archived():
+    tasks = get_all_tasks(archived=True)
+    tasks.sort(key=lambda t: t.get('archived_at') or '', reverse=True)
+    return jsonify(tasks)
+
+
+@app.route('/api/tasks/<int:task_id>/archive', methods=['POST'])
+def archive_task(task_id):
+    set_archived(task_id, True)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/tasks/<int:task_id>/unarchive', methods=['POST'])
+def unarchive_task(task_id):
+    set_archived(task_id, False)
+    return jsonify({'ok': True})
+
+
 @app.route('/api/tasks/export', methods=['GET'])
 def export_tasks():
-    tasks = get_all_tasks()
+    tasks = get_all_tasks(archived=None)
     export = []
     for t in tasks:
         export.append({
@@ -143,11 +164,13 @@ def export_tasks():
             'schedule_type': t.get('schedule_type', 'interval'),
             'fixed_unit': t.get('fixed_unit'),
             'fixed_value': t.get('fixed_value'),
+            'fixed_set': t.get('fixed_set'),
             'notes': t.get('notes'),
             'last_completed': t.get('last_completed'),
             'snoozed_until': t.get('snoozed_until'),
             'sensor_enabled': t.get('sensor_enabled', False),
             'qr_enabled': t.get('qr_enabled', False),
+            'archived_at': t.get('archived_at'),
             'completions': [c['completed_at'] for c in t.get('completions', [])],
         })
     return jsonify(export)
@@ -179,17 +202,28 @@ def import_tasks():
         snoozed_until = t.get('snoozed_until')
         if snoozed_until and not _valid_iso(snoozed_until):
             return jsonify({'error': f'Invalid snoozed_until for task "{name}"'}), 400
-        entries.append((t, name, completions))
+        archived_at = t.get('archived_at')
+        if archived_at and not _valid_iso(archived_at):
+            return jsonify({'error': f'Invalid archived_at for task "{name}"'}), 400
+        fixed = (None, None, None)
+        if t.get('schedule_type') == 'fixed':
+            try:
+                fixed = normalize_fixed(t.get('fixed_unit'), t.get('fixed_value'),
+                                        t.get('fixed_set'))
+            except (TypeError, ValueError) as err:
+                return jsonify({'error': f'Invalid fixed schedule for task "{name}": {err}'}), 400
+        entries.append((t, name, completions, fixed))
 
     count = 0
-    for t, name, completions in entries:
+    for t, name, completions, fixed in entries:
         freq = t.get('frequency_days')
         task_id = add_task(
             name=name,
             frequency_days=freq if isinstance(freq, int) else 7,
             schedule_type=t.get('schedule_type', 'interval'),
-            fixed_unit=t.get('fixed_unit'),
-            fixed_value=t.get('fixed_value'),
+            fixed_unit=fixed[0],
+            fixed_value=fixed[1],
+            fixed_set=fixed[2],
             notes=t.get('notes'),
             sensor_enabled=t.get('sensor_enabled', False),
         )
@@ -201,6 +235,8 @@ def import_tasks():
             edit_task(task_id, snoozed_until=t['snoozed_until'] or '')
         if t.get('qr_enabled'):
             edit_task(task_id, qr_enabled=True)
+        if t.get('archived_at'):
+            set_archived(task_id, True, archived_at=t['archived_at'])
         count += 1
     return jsonify({'ok': True, 'imported': count}), 201
 
@@ -212,13 +248,23 @@ def update_task(task_id):
     notes = data.get('notes')
     sensor_enabled = data.get('sensor_enabled')
     qr_enabled = data.get('qr_enabled')
+    fixed_unit = fixed_value = fixed_set = None
+    if data.get('fixed_unit') is not None:
+        try:
+            fixed_unit, fixed_value, fixed_set = normalize_fixed(
+                data['fixed_unit'], data.get('fixed_value'), data.get('fixed_set'))
+        except (TypeError, ValueError) as err:
+            return jsonify({'error': f'Invalid fixed schedule: {err}'}), 400
+    elif data.get('fixed_value') is not None:
+        fixed_value = int(data['fixed_value'])
     edit_task(
         task_id,
         name=data.get('name'),
         frequency_days=int(freq) if freq is not None else None,
         schedule_type=data.get('schedule_type'),
-        fixed_unit=data.get('fixed_unit'),
-        fixed_value=int(data['fixed_value']) if data.get('fixed_value') is not None else None,
+        fixed_unit=fixed_unit,
+        fixed_value=fixed_value,
+        fixed_set=fixed_set,
         notes=notes,
         sensor_enabled=sensor_enabled,
         qr_enabled=qr_enabled
@@ -334,16 +380,15 @@ def _add_human_labels(task):
     elif stype == 'fixed':
         unit = task.get('fixed_unit')
         val = task.get('fixed_value')
-        if unit == 'weekly' and val is not None and 0 <= val < 7:
-            task['schedule_human'] = f'Every {_DOW[val]}'
-        elif unit == 'monthly' and val is not None:
-            task['schedule_human'] = f'Monthly on day {val}'
-        elif unit == 'yearly' and val is not None:
-            m, d = val // 100, val % 100
-            if 1 <= m <= 12:
-                task['schedule_human'] = f'Yearly on {_MONTHS[m]} {d}'
+        sel = task.get('fixed_set') or []
+        if unit == 'weekly' and sel:
+            task['schedule_human'] = 'Every ' + ', '.join(_DOW[d] for d in sel if 0 <= d < 7)
+        elif unit == 'monthly' and val is not None and sel:
+            if len(sel) == 12:
+                task['schedule_human'] = f'Monthly on day {val}'
             else:
-                task['schedule_human'] = 'Yearly'
+                months = ', '.join(_MONTHS[m] for m in sel if 1 <= m <= 12)
+                task['schedule_human'] = f'{months} on day {val}'
         else:
             task['schedule_human'] = 'Fixed'
     else:

@@ -131,18 +131,84 @@ async function unsnoozeTask(id) {
     loadTasks(id);
 }
 
-// Fixed unit sub-field switching
-const fixedUnitSelect = document.getElementById('fixed-unit');
-const fixedDow = document.getElementById('fixed-dow');
-const fixedDom = document.getElementById('fixed-dom');
-const fixedYearlyInputs = document.getElementById('fixed-yearly-inputs');
+// Fixed schedule picker: Weekly (pick weekdays) or Monthly (day of month +
+// pick months). Shared by the add form and the inline editor.
+function createFixedPicker(init = {}) {
+    const el = document.createElement('div');
+    el.className = 'fixed-picker';
 
-fixedUnitSelect.addEventListener('change', () => {
-    const unit = fixedUnitSelect.value;
-    fixedDow.style.display = unit === 'weekly' ? '' : 'none';
-    fixedDom.style.display = unit === 'monthly' ? '' : 'none';
-    fixedYearlyInputs.style.display = unit === 'yearly' ? '' : 'none';
-});
+    const unitSel = document.createElement('select');
+    [{v: 'weekly', l: 'Weekly'}, {v: 'monthly', l: 'Monthly'}].forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.v; opt.textContent = o.l;
+        unitSel.appendChild(opt);
+    });
+    unitSel.value = init.unit === 'monthly' ? 'monthly' : 'weekly';
+
+    function chipRow(labels, values, selected) {
+        const row = document.createElement('div');
+        row.className = 'chip-row';
+        labels.forEach((label, i) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'chip' + (selected.includes(values[i]) ? ' active' : '');
+            chip.textContent = label;
+            chip.dataset.value = values[i];
+            chip.addEventListener('click', () => chip.classList.toggle('active'));
+            row.appendChild(chip);
+        });
+        return row;
+    }
+    const chosen = row => [...row.querySelectorAll('.chip.active')].map(c => parseInt(c.dataset.value));
+
+    const isWeekly = init.unit === 'weekly';
+    const isMonthly = init.unit === 'monthly';
+    const dowRow = chipRow(DAY_NAMES.map(d => d.slice(0, 3)), [0, 1, 2, 3, 4, 5, 6],
+        isWeekly && init.set ? init.set : [(new Date().getDay() + 6) % 7]);
+
+    const monthWrap = document.createElement('div');
+    monthWrap.className = 'fixed-monthly';
+    const dayLabel = document.createElement('label');
+    dayLabel.textContent = 'Day ';
+    const dayInp = document.createElement('input');
+    dayInp.type = 'number';
+    dayInp.inputMode = 'numeric';
+    dayInp.min = '1'; dayInp.max = '31';
+    dayInp.placeholder = '#';
+    dayInp.value = isMonthly ? init.value : new Date().getDate();
+    dayLabel.appendChild(dayInp);
+    const allMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const monthRow = chipRow(MONTH_ABBR.slice(1), allMonths,
+        isMonthly && init.set ? init.set : allMonths);
+    monthWrap.appendChild(dayLabel);
+    monthWrap.appendChild(monthRow);
+
+    function sync() {
+        dowRow.style.display = unitSel.value === 'weekly' ? '' : 'none';
+        monthWrap.style.display = unitSel.value === 'monthly' ? '' : 'none';
+    }
+    unitSel.addEventListener('change', sync);
+    sync();
+
+    el.appendChild(unitSel);
+    el.appendChild(dowRow);
+    el.appendChild(monthWrap);
+
+    // Returns {fixed_unit, fixed_value, fixed_set}, or null if incomplete
+    function read() {
+        if (unitSel.value === 'weekly') {
+            const days = chosen(dowRow);
+            if (!days.length) return null;
+            return { fixed_unit: 'weekly', fixed_value: days[0], fixed_set: days };
+        }
+        const day = parseInt(dayInp.value);
+        const months = chosen(monthRow);
+        if (!day || day < 1 || day > 31 || !months.length) return null;
+        return { fixed_unit: 'monthly', fixed_value: day, fixed_set: months };
+    }
+    return { el, read, focus: () => unitSel.focus() };
+}
+
 
 const toggleNotesBtn = document.getElementById('toggle-notes');
 const taskNotes = document.getElementById('task-notes');
@@ -168,20 +234,9 @@ addTaskForm.addEventListener('submit', async (e) => {
         if (!freq) return;
         body = { name, frequency_days: freq * unit, notes };
     } else {
-        const fixedUnit = fixedUnitSelect.value;
-        let fixedValue;
-        if (fixedUnit === 'weekly') {
-            fixedValue = parseInt(fixedDow.value);
-        } else if (fixedUnit === 'monthly') {
-            fixedValue = parseInt(fixedDom.value);
-            if (!fixedValue || fixedValue < 1 || fixedValue > 31) return;
-        } else {
-            const month = parseInt(document.getElementById('fixed-month').value);
-            const day = parseInt(document.getElementById('fixed-year-day').value);
-            if (!day || day < 1 || day > 31) return;
-            fixedValue = month * 100 + day;
-        }
-        body = { name, schedule_type: 'fixed', fixed_unit: fixedUnit, fixed_value: fixedValue, notes };
+        const fixed = addFixedPicker.read();
+        if (!fixed) return;
+        body = { name, schedule_type: 'fixed', ...fixed, notes };
     }
 
     const resp = await fetch(`${BASE}/api/tasks`, {
@@ -198,6 +253,9 @@ addTaskForm.addEventListener('submit', async (e) => {
     toggleNotesBtn.classList.remove('active');
     addTaskForm.classList.remove('open');
     addTaskToggle.textContent = '+ New Task';
+    addFixedPicker.el.remove();
+    addFixedPicker = createFixedPicker();
+    fixedFields.appendChild(addFixedPicker.el);
     loadTasks(result.id);
 });
 
@@ -220,13 +278,14 @@ const BUCKET_LABELS = {
 };
 
 async function loadTasks(highlightId) {
-    let tasks;
+    let tasks, archived;
     try {
         const res = await fetch(`${BASE}/api/tasks`);
         if (!res.ok) {
             throw new Error(`API returned HTTP ${res.status} ${res.statusText}`);
         }
         tasks = await res.json();
+        archived = await fetchArchived();
     } catch (err) {
         console.error('[HomeFrequency] loadTasks failed:', err);
         showLoadError(err);
@@ -245,16 +304,18 @@ async function loadTasks(highlightId) {
 
     const logoWrap = document.createElement('div');
     logoWrap.className = 'app-logo-row';
-    const logoTextLeft = document.createElement('span');
-    logoTextLeft.className = 'app-logo-text';
-    logoTextLeft.textContent = 'HOME';
+    const logoTextLeft = document.createElement('img');
+    logoTextLeft.src = `${BASE}/static/logo-home.png`;
+    logoTextLeft.alt = 'Home';
+    logoTextLeft.className = 'app-logo-word';
     const logoImg = document.createElement('img');
     logoImg.src = `${BASE}/static/logo-icon.png`;
-    logoImg.alt = 'HomeFrequency';
+    logoImg.alt = '';
     logoImg.className = 'app-logo-icon';
-    const logoTextRight = document.createElement('span');
-    logoTextRight.className = 'app-logo-text';
-    logoTextRight.textContent = 'FREQUENCY';
+    const logoTextRight = document.createElement('img');
+    logoTextRight.src = `${BASE}/static/logo-frequency.png`;
+    logoTextRight.alt = 'Frequency';
+    logoTextRight.className = 'app-logo-word';
     logoWrap.appendChild(logoTextLeft);
     logoWrap.appendChild(logoImg);
     logoWrap.appendChild(logoTextRight);
@@ -380,7 +441,7 @@ async function loadTasks(highlightId) {
                 ${!isSnoozed && (days === null || days < 0) ? `<button class="btn-snooze" onclick="openSnoozeMenu(this, ${task.id})" aria-label="Snooze" title="Snooze">Zzz</button>` : ''}
                 ${hasHistory ? `<button class="btn-undo" onclick="undoLastCompletion(${task.completions[0].id})" title="Undo last completion">Undo</button>` : ''}
                 <button class="btn-done" onclick="completeTask(${task.id})">Reset</button>
-                <button class="btn-delete" onclick="deleteTask(${task.id}, this)">Delete</button>
+                <button class="btn-delete" onclick="archiveTask(${task.id})" title="Hide this task; restore or delete it from Archived">Archive</button>
             </div>
         `;
 
@@ -593,10 +654,10 @@ async function loadTasks(highlightId) {
                     if (!metaEl.contains(document.activeElement)) save();
                 }, 0));
 
-            } else if (task.fixed_unit === 'weekly') {
+            } else if (stype === 'fixed') {
                 metaEl.innerHTML = '';
-                const wrap = document.createElement('span');
-                wrap.className = 'freq-edit';
+                const wrap = document.createElement('div');
+                wrap.className = 'freq-edit fixed-edit';
 
                 const typeSelect = document.createElement('select');
                 typeSelect.className = 'type-switch';
@@ -607,218 +668,54 @@ async function loadTasks(highlightId) {
                     typeSelect.appendChild(opt);
                 });
 
-                const sel = document.createElement('select');
-                DAY_NAMES.forEach((name, i) => {
-                    const opt = document.createElement('option');
-                    opt.value = i; opt.textContent = name;
-                    if (i === task.fixed_value) opt.selected = true;
-                    sel.appendChild(opt);
+                const picker = createFixedPicker({
+                    unit: task.fixed_unit, value: task.fixed_value, set: task.fixed_set
                 });
-                wrap.appendChild(typeSelect);
-                wrap.appendChild(sel);
-                metaEl.appendChild(wrap);
-                sel.focus();
-
-                let saved = false;
-
-                typeSelect.addEventListener('change', async () => {
-                    if (saved) return;
-                    if (typeSelect.value === 'dynamic') {
-                        saved = true;
-                        await fetch(`${BASE}/api/tasks/${task.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ schedule_type: 'dynamic' })
-                        });
-                        loadTasks(task.id);
-                    }
-                });
-
-                async function save() {
-                    if (saved) return;
-                    saved = true;
-                    const val = parseInt(sel.value);
-                    if (val !== task.fixed_value) {
-                        await fetch(`${BASE}/api/tasks/${task.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fixed_value: val })
-                        });
-                        loadTasks(task.id);
-                    } else {
-                        cancelEdit();
-                    }
-                }
-                sel.addEventListener('change', save);
-                sel.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Escape') { saved = true; cancelEdit(); }
-                });
-                typeSelect.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Escape') { saved = true; cancelEdit(); }
-                });
-                sel.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
-                typeSelect.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
-
-            } else if (task.fixed_unit === 'monthly') {
-                metaEl.innerHTML = '';
-                const wrap = document.createElement('span');
-                wrap.className = 'freq-edit';
-
-                const typeSelect = document.createElement('select');
-                typeSelect.className = 'type-switch';
-                [{v:'fixed',l:'Fixed'},{v:'dynamic',l:'Dynamic'}].forEach(o => {
-                    const opt = document.createElement('option');
-                    opt.value = o.v; opt.textContent = o.l;
-                    if (o.v === 'fixed') opt.selected = true;
-                    typeSelect.appendChild(opt);
-                });
-
-                const inp = document.createElement('input');
-                inp.type = 'number';
-                inp.inputMode = 'numeric';
-                inp.min = '1'; inp.max = '31';
-                inp.value = task.fixed_value;
-                wrap.appendChild(typeSelect);
-                wrap.appendChild(inp);
-                metaEl.appendChild(wrap);
-                inp.focus();
-                inp.select();
-
-                let saved = false;
-
-                typeSelect.addEventListener('change', async () => {
-                    if (saved) return;
-                    if (typeSelect.value === 'dynamic') {
-                        saved = true;
-                        await fetch(`${BASE}/api/tasks/${task.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ schedule_type: 'dynamic' })
-                        });
-                        loadTasks(task.id);
-                    }
-                });
-
-                async function save() {
-                    if (saved) return;
-                    saved = true;
-                    const val = parseInt(inp.value);
-                    if (val && val >= 1 && val <= 31 && val !== task.fixed_value) {
-                        await fetch(`${BASE}/api/tasks/${task.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fixed_value: val })
-                        });
-                        loadTasks(task.id);
-                    } else {
-                        cancelEdit();
-                    }
-                }
-                inp.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Enter') { ev.preventDefault(); save(); }
-                    if (ev.key === 'Escape') { saved = true; cancelEdit(); }
-                });
-                typeSelect.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Escape') { saved = true; cancelEdit(); }
-                });
-                inp.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
-                typeSelect.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
-
-            } else if (task.fixed_unit === 'yearly') {
-                const curMonth = Math.floor(task.fixed_value / 100);
-                const curDay = task.fixed_value % 100;
-
-                metaEl.innerHTML = '';
-                const wrap = document.createElement('span');
-                wrap.className = 'freq-edit';
-
-                const typeSelect = document.createElement('select');
-                typeSelect.className = 'type-switch';
-                [{v:'fixed',l:'Fixed'},{v:'dynamic',l:'Dynamic'}].forEach(o => {
-                    const opt = document.createElement('option');
-                    opt.value = o.v; opt.textContent = o.l;
-                    if (o.v === 'fixed') opt.selected = true;
-                    typeSelect.appendChild(opt);
-                });
-
-                const monthSel = document.createElement('select');
-                MONTH_ABBR.forEach((name, i) => {
-                    if (i === 0) return;
-                    const opt = document.createElement('option');
-                    opt.value = i; opt.textContent = name;
-                    if (i === curMonth) opt.selected = true;
-                    monthSel.appendChild(opt);
-                });
-
-                const dayInp = document.createElement('input');
-                dayInp.type = 'number';
-                dayInp.inputMode = 'numeric';
-                dayInp.min = '1'; dayInp.max = '31';
-                dayInp.value = curDay;
+                const saveBtn = document.createElement('button');
+                saveBtn.type = 'button';
+                saveBtn.className = 'fixed-save';
+                saveBtn.textContent = 'Save';
+                const cancelBtn = document.createElement('button');
+                cancelBtn.type = 'button';
+                cancelBtn.className = 'fixed-cancel';
+                cancelBtn.textContent = 'Cancel';
 
                 wrap.appendChild(typeSelect);
-                wrap.appendChild(monthSel);
-                wrap.appendChild(dayInp);
+                wrap.appendChild(picker.el);
+                wrap.appendChild(saveBtn);
+                wrap.appendChild(cancelBtn);
                 metaEl.appendChild(wrap);
-                monthSel.focus();
+                picker.focus();
 
                 let saved = false;
-
                 typeSelect.addEventListener('change', async () => {
-                    if (saved) return;
-                    if (typeSelect.value === 'dynamic') {
-                        saved = true;
-                        await fetch(`${BASE}/api/tasks/${task.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ schedule_type: 'dynamic' })
-                        });
-                        loadTasks(task.id);
-                    }
+                    if (saved || typeSelect.value !== 'dynamic') return;
+                    saved = true;
+                    await fetch(`${BASE}/api/tasks/${task.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schedule_type: 'dynamic' })
+                    });
+                    loadTasks(task.id);
                 });
 
-                async function save() {
+                saveBtn.addEventListener('click', async () => {
                     if (saved) return;
+                    const fixed = picker.read();
+                    if (!fixed) return;
                     saved = true;
-                    const m = parseInt(monthSel.value);
-                    const d = parseInt(dayInp.value);
-                    const newVal = m * 100 + d;
-                    if (d && d >= 1 && d <= 31 && newVal !== task.fixed_value) {
-                        await fetch(`${BASE}/api/tasks/${task.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fixed_value: newVal })
-                        });
-                        loadTasks(task.id);
-                    } else {
-                        cancelEdit();
-                    }
-                }
-
-                function onKey(ev) {
-                    if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+                    await fetch(`${BASE}/api/tasks/${task.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(fixed)
+                    });
+                    loadTasks(task.id);
+                });
+                cancelBtn.addEventListener('click', () => { saved = true; cancelEdit(); });
+                wrap.addEventListener('keydown', (ev) => {
                     if (ev.key === 'Escape') { saved = true; cancelEdit(); }
-                }
-                typeSelect.addEventListener('keydown', onKey);
-                monthSel.addEventListener('keydown', onKey);
-                dayInp.addEventListener('keydown', onKey);
-                typeSelect.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
-                monthSel.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
-                dayInp.addEventListener('blur', () => setTimeout(() => {
-                    if (!metaEl.contains(document.activeElement)) save();
-                }, 0));
+                    if (ev.key === 'Enter') { ev.preventDefault(); saveBtn.click(); }
+                });
             }
         });
 
@@ -1106,6 +1003,8 @@ async function loadTasks(highlightId) {
         }
     });
 
+    renderArchived(archived);
+
     // Re-apply any active filter after re-render, then restore scroll
     applyTaskFilter();
     if (!highlightId) taskList.scrollTop = prevScroll;
@@ -1185,6 +1084,10 @@ if (taskFilterInput) {
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTH_ABBR = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// Built here, after DAY_NAMES/MONTH_ABBR exist
+let addFixedPicker = createFixedPicker();
+fixedFields.appendChild(addFixedPicker.el);
+
 function formatGap(days) {
     if (days >= 365) {
         const y = Math.floor(days / 365);
@@ -1219,12 +1122,14 @@ function formatTaskFrequency(task) {
     if (stype === 'fixed') {
         const unit = task.fixed_unit;
         const val = task.fixed_value;
-        if (unit === 'weekly') return `Every ${DAY_NAMES[val]}`;
-        if (unit === 'monthly') return `Every ${ordinal(val)}`;
-        if (unit === 'yearly') {
-            const month = Math.floor(val / 100);
-            const day = val % 100;
-            return `Every ${MONTH_ABBR[month]} ${day}`;
+        const sel = task.fixed_set || [];
+        if (unit === 'weekly' && sel.length) {
+            if (sel.length === 1) return `Every ${DAY_NAMES[sel[0]]}`;
+            return `Every ${sel.map(d => DAY_NAMES[d].slice(0, 3)).join(', ')}`;
+        }
+        if (unit === 'monthly' && sel.length) {
+            if (sel.length === 12) return `Every ${ordinal(val)}`;
+            return `${sel.map(m => MONTH_ABBR[m]).join(', ')} ${ordinal(val)}`;
         }
     }
     return `Every ${formatFrequency(task.frequency_days)}`;
@@ -1263,6 +1168,68 @@ async function completeTaskAt(id, dateStr) {
         body: JSON.stringify({ completed_at: dateStr + 'T12:00:00' })
     });
     loadTasks(id);
+}
+
+async function archiveTask(id) {
+    await fetch(`${BASE}/api/tasks/${id}/archive`, { method: 'POST' });
+    loadTasks();
+}
+
+async function unarchiveTask(id) {
+    await fetch(`${BASE}/api/tasks/${id}/unarchive`, { method: 'POST' });
+    loadTasks(id);
+}
+
+let archivedOpen = false;
+
+async function fetchArchived() {
+    try {
+        const res = await fetch(`${BASE}/api/tasks/archived`);
+        return res.ok ? await res.json() : [];
+    } catch (err) {
+        console.error('[HomeFrequency] archived load failed:', err);
+        return [];
+    }
+}
+
+// Collapsible "Archived (N)" section at the bottom of the list
+function renderArchived(archived) {
+    if (!archived.length) return;
+
+    const section = document.createElement('div');
+    section.className = 'archived-section' + (archivedOpen ? ' open' : '');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'archived-toggle';
+    toggle.textContent = `Archived (${archived.length})`;
+    toggle.addEventListener('click', () => {
+        archivedOpen = section.classList.toggle('open');
+    });
+    section.appendChild(toggle);
+
+    const list = document.createElement('div');
+    list.className = 'archived-list';
+    archived.forEach(task => {
+        const row = document.createElement('div');
+        row.className = 'task-card archived-card';
+        row.dataset.search = [task.name || '', task.notes || ''].join(' ').toLowerCase();
+        const when = task.archived_at
+            ? new Date(task.archived_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+            : '';
+        row.innerHTML = `
+            <div class="archived-info">
+                <span class="archived-name">${escapeHtml(task.name)}</span>
+                <span class="archived-date">Archived ${when}</span>
+            </div>
+            <div class="task-actions">
+                <button class="btn-done" onclick="unarchiveTask(${task.id})">Restore</button>
+                <button class="btn-delete" onclick="deleteTask(${task.id}, this)">Delete</button>
+            </div>
+        `;
+        list.appendChild(row);
+    });
+    section.appendChild(list);
+    taskList.appendChild(section);
 }
 
 function deleteTask(id, btn) {

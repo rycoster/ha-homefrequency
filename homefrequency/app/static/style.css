@@ -82,18 +82,18 @@ button {
     width: auto;
 }
 
+/* Header art is white; flip it to black on light backgrounds */
 @media (prefers-color-scheme: light) {
-    .app-logo-icon {
+    .app-logo-icon,
+    .app-logo-word {
         filter: invert(1);
     }
 }
 
-.app-logo-text {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 36px;
-    font-weight: 400;
-    letter-spacing: 6px;
-    color: var(--text-primary);
+/* Word images are as tall as the icon (text pre-aligned to the clock face) */
+.app-logo-word {
+    height: 43px;
+    width: auto;
 }
 
 
@@ -293,9 +293,88 @@ button {
     background: var(--hover-bg);
 }
 
-#fixed-yearly-inputs {
+.fixed-picker {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.fixed-monthly {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.fixed-monthly label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
     gap: 4px;
+}
+
+.chip {
+    padding: 4px 8px;
+    background: var(--input-bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.fixed-picker select,
+.fixed-picker input {
+    padding: 4px 6px;
+    background: var(--input-bg);
+    border: 1px solid var(--divider);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+}
+
+.fixed-picker input {
+    width: 52px;
+    text-align: center;
+}
+
+.fixed-edit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.fixed-save,
+.fixed-cancel {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--divider);
+    font-size: 12px;
+    cursor: pointer;
+    background: var(--input-bg);
+    color: var(--text-primary);
+}
+
+.fixed-save {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
 }
 
 .freq-group {
@@ -1070,9 +1149,8 @@ button {
 
 /* Responsive — 600px covers all phones (390-430px is the modern norm) */
 @media (max-width: 600px) {
-    .app-logo-text {
-        font-size: 22px;
-        letter-spacing: 3px;
+    .app-logo-word {
+        height: 28px;
     }
 
     .app-logo-icon {
@@ -1507,4 +1585,74 @@ body.qr-modal-open { overflow: hidden; }
     body.qr-printing .qr-task-name {
         font-size: 12pt;
     }
+}
+
+/* Archived tasks */
+.archived-section {
+    margin-top: 16px;
+}
+
+.archived-toggle {
+    width: 100%;
+    padding: 8px;
+    background: none;
+    border: 1px dashed var(--divider);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.archived-list {
+    display: none;
+    margin-top: 8px;
+}
+
+.archived-section.open .archived-list {
+    display: block;
+}
+
+.archived-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    opacity: 0.75;
+}
+
+.archived-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.archived-name {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.archived-date {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Stay one compact row, even under the mobile column layout */
+.task-card.archived-card {
+    flex-direction: row;
+    text-align: left;
+}
+
+.archived-info {
+    align-items: flex-start;
+    flex: 1;
+}
+
+.task-card.archived-card .task-actions {
+    display: flex;
+    gap: 4px;
+    width: auto;
+}
+
+.task-card.archived-card .task-actions button {
+    flex: none;
 }

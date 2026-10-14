@@ -12,6 +12,47 @@ DB_DIR = os.environ.get('DB_DIR', os.path.join(os.path.dirname(os.path.dirname(_
 DB_PATH = os.path.join(DB_DIR, 'tasks.db')
 
 
+def normalize_fixed(unit, value, selection):
+    """Normalize a fixed schedule to (unit, value, fixed_set).
+
+    weekly:  fixed_set = selected weekdays (0=Mon..6=Sun); value = first one.
+    monthly: fixed_set = selected months (1-12); value = day of month (1-31).
+    A legacy yearly schedule (value = MMDD) becomes monthly with one month.
+    A missing selection falls back to the old single-choice meaning: the one
+    weekday in value, or every month. Raises ValueError on bad input.
+    """
+    if unit == 'yearly':
+        value = int(value)
+        unit, selection, value = 'monthly', [value // 100], value % 100
+    if unit == 'weekly':
+        if selection is None:
+            selection = [int(value)]
+        days = sorted({int(d) for d in selection})
+        if not days or not all(0 <= d <= 6 for d in days):
+            raise ValueError('Weekly schedule needs weekdays 0-6')
+        return 'weekly', days[0], ','.join(map(str, days))
+    if unit == 'monthly':
+        value = int(value)
+        if not 1 <= value <= 31:
+            raise ValueError('Day of month must be 1-31')
+        if selection is None:
+            selection = range(1, 13)
+        months = sorted({int(m) for m in selection})
+        if not months or not all(1 <= m <= 12 for m in months):
+            raise ValueError('Monthly schedule needs months 1-12')
+        return 'monthly', value, ','.join(map(str, months))
+    raise ValueError(f'Unknown fixed unit: {unit}')
+
+
+def parse_fixed_set(value):
+    """Turn a stored fixed_set string ("1,4,10") into a list of ints."""
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    return [int(x) for x in value.split(',') if x.strip()]
+
+
 def get_db():
     os.makedirs(DB_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -48,6 +89,23 @@ def init_db():
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN qr_token TEXT")
     if 'qr_enabled' not in cols:
         conn.execute("ALTER TABLE recurring_tasks ADD COLUMN qr_enabled INTEGER DEFAULT 0")
+    if 'fixed_set' not in cols:
+        conn.execute("ALTER TABLE recurring_tasks ADD COLUMN fixed_set TEXT")
+    if 'archived_at' not in cols:
+        conn.execute("ALTER TABLE recurring_tasks ADD COLUMN archived_at TIMESTAMP")
+    # Backfill fixed_set for fixed tasks created before multi-select existing
+    # (single weekday, every month, or a yearly MMDD date)
+    legacy = conn.execute(
+        "SELECT id, fixed_unit, fixed_value FROM recurring_tasks "
+        "WHERE schedule_type = 'fixed' AND (fixed_set IS NULL OR fixed_unit = 'yearly')"
+    ).fetchall()
+    for row in legacy:
+        try:
+            unit, value, fixed_set = normalize_fixed(row[1], row[2], None)
+        except (TypeError, ValueError):
+            continue  # malformed legacy row; leave it as-is
+        conn.execute('UPDATE recurring_tasks SET fixed_unit = ?, fixed_value = ?, fixed_set = ? WHERE id = ?',
+                     (unit, value, fixed_set, row[0]))
     # Backfill qr_token for any rows missing one (existing or newly-migrated)
     missing = conn.execute(
         "SELECT id FROM recurring_tasks WHERE qr_token IS NULL OR qr_token = ''"
@@ -149,18 +207,21 @@ def _calc_dynamic_interval(completions):
 
 
 def add_task(name, frequency_days=0, schedule_type='interval',
-             fixed_unit=None, fixed_value=None, notes=None, sensor_enabled=False):
+             fixed_unit=None, fixed_value=None, notes=None, sensor_enabled=False,
+             fixed_set=None):
     conn = get_db()
-    # Dynamic tasks start with no implicit first completion
-    last_completed = None if schedule_type == 'dynamic' else datetime.now().isoformat()
+    # Dynamic tasks start with no implicit first completion; neither do fixed
+    # tasks, whose first scheduled date on/after today should be due (an
+    # implicit completion would be credited to it and skip it)
+    last_completed = None if schedule_type in ('dynamic', 'fixed') else datetime.now().isoformat()
     # Dynamic tasks get a default 7-day snooze so they place inline in the list
     # instead of piling up at the bottom while tracking
     snoozed_until = (datetime.now() + timedelta(days=7)).isoformat() if schedule_type == 'dynamic' else None
     cur = conn.execute(
         '''INSERT INTO recurring_tasks
-           (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes, last_completed, sensor_enabled, snoozed_until, qr_token)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-        (name, frequency_days, schedule_type, fixed_unit, fixed_value, notes,
+           (name, frequency_days, schedule_type, fixed_unit, fixed_value, fixed_set, notes, last_completed, sensor_enabled, snoozed_until, qr_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        (name, frequency_days, schedule_type, fixed_unit, fixed_value, fixed_set, notes,
          last_completed, 1 if sensor_enabled else 0, snoozed_until, _new_qr_token())
     )
     task_id = cur.lastrowid
@@ -206,7 +267,7 @@ def find_task_by_qr(task_id, token):
         return None
     conn = get_db()
     row = conn.execute(
-        'SELECT * FROM recurring_tasks WHERE id = ? AND qr_token = ?',
+        'SELECT * FROM recurring_tasks WHERE id = ? AND qr_token = ? AND archived_at IS NULL',
         (task_id, token)
     ).fetchone()
     conn.close()
@@ -263,6 +324,15 @@ def edit_completion(completion_id, new_date):
     return task_id
 
 
+def set_archived(task_id, archived, archived_at=None):
+    """Archive (hide, keeping history) or restore a task."""
+    value = (archived_at or datetime.now().isoformat()) if archived else None
+    conn = get_db()
+    conn.execute('UPDATE recurring_tasks SET archived_at = ? WHERE id = ?', (value, task_id))
+    conn.commit()
+    conn.close()
+
+
 def delete_task(task_id):
     conn = get_db()
     conn.execute('DELETE FROM recurring_tasks WHERE id = ?', (task_id,))
@@ -272,7 +342,7 @@ def delete_task(task_id):
 
 def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
               fixed_unit=None, fixed_value=None, notes=None, snoozed_until=None,
-              sensor_enabled=None, qr_enabled=None):
+              sensor_enabled=None, qr_enabled=None, fixed_set=None):
     conn = get_db()
     if name is not None:
         conn.execute('UPDATE recurring_tasks SET name = ? WHERE id = ?', (name, task_id))
@@ -284,6 +354,8 @@ def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
         conn.execute('UPDATE recurring_tasks SET fixed_unit = ? WHERE id = ?', (fixed_unit, task_id))
     if fixed_value is not None:
         conn.execute('UPDATE recurring_tasks SET fixed_value = ? WHERE id = ?', (fixed_value, task_id))
+    if fixed_set is not None:
+        conn.execute('UPDATE recurring_tasks SET fixed_set = ? WHERE id = ?', (fixed_set, task_id))
     if notes is not None:
         conn.execute('UPDATE recurring_tasks SET notes = ? WHERE id = ?', (notes, task_id))
     if snoozed_until is not None:
@@ -300,6 +372,27 @@ def edit_task(task_id, name=None, frequency_days=None, schedule_type=None,
     conn.close()
 
 
+def _add_interval(start, frequency_days):
+    """Advance start by an interval task's frequency.
+
+    Frequencies that are whole years (multiples of 365) or whole months
+    (multiples of 30) -- how the UI stores "N years"/"N months" -- advance by
+    calendar months, keeping the day of the month (clamped to the month's
+    length). Anything else advances by plain days.
+    """
+    if frequency_days >= 365 and frequency_days % 365 == 0:
+        months = frequency_days // 365 * 12
+    elif frequency_days >= 30 and frequency_days % 30 == 0:
+        months = frequency_days // 30
+    else:
+        return start + timedelta(days=frequency_days)
+    total = start.year * 12 + (start.month - 1) + months
+    y, m = divmod(total, 12)
+    m += 1
+    return start.replace(year=y, month=m,
+                         day=min(start.day, calendar.monthrange(y, m)[1]))
+
+
 def _next_fixed_due(task):
     """Calculate the due date for a fixed-schedule task.
 
@@ -312,83 +405,67 @@ def _next_fixed_due(task):
     now = datetime.now()
     unit = task['fixed_unit']
     val = task['fixed_value']
+    selected = set(parse_fixed_set(task.get('fixed_set')))
+    if not selected:
+        return now
     last = _parse_ts(task['last_completed'])
 
     def _to_dt(d):
         return datetime(d.year, d.month, d.day)
 
-    def _nearest(prev_occ, next_occ, completed):
-        if (completed - prev_occ) <= (next_occ - completed):
-            return prev_occ
-        return next_occ
-
     if unit == 'weekly':
-        # val = day of week (0=Mon..6=Sun)
+        # selected = weekdays (0=Mon..6=Sun)
         def occ_on_or_after(d):
-            return d + timedelta(days=(val - d.weekday()) % 7)
+            for i in range(7):
+                c = d + timedelta(days=i)
+                if c.weekday() in selected:
+                    return c
 
-        if not last:
-            return _to_dt(occ_on_or_after(now.date()))
-        ld = last.date()
-        t_next = occ_on_or_after(ld)
-        covered = _nearest(t_next - timedelta(days=7), t_next, ld)
-        return _to_dt(covered + timedelta(days=7))
+        def occ_before(d):
+            for i in range(1, 8):
+                c = d - timedelta(days=i)
+                if c.weekday() in selected:
+                    return c
 
     elif unit == 'monthly':
-        # val = day of month (1-31, clamped to the month's length)
+        # selected = months (1-12); val = day of month, clamped to month length
         def occ(y, m):
             return date(y, m, min(val, calendar.monthrange(y, m)[1]))
 
-        def next_month(y, m):
-            return (y + 1, 1) if m == 12 else (y, m + 1)
+        def occ_on_or_after(d):
+            y, m = d.year, d.month
+            for _ in range(13):
+                if m in selected and occ(y, m) >= d:
+                    return occ(y, m)
+                y, m = (y + 1, 1) if m == 12 else (y, m + 1)
 
-        def prev_month(y, m):
-            return (y - 1, 12) if m == 1 else (y, m - 1)
+        def occ_before(d):
+            y, m = d.year, d.month
+            for _ in range(13):
+                if m in selected and occ(y, m) < d:
+                    return occ(y, m)
+                y, m = (y - 1, 12) if m == 1 else (y, m - 1)
 
-        if not last:
-            candidate = occ(now.year, now.month)
-            if candidate < now.date():
-                candidate = occ(*next_month(now.year, now.month))
-            return _to_dt(candidate)
-        ld = last.date()
-        t = occ(ld.year, ld.month)
-        if t >= ld:
-            t_prev, t_next = occ(*prev_month(ld.year, ld.month)), t
-        else:
-            t_prev, t_next = t, occ(*next_month(ld.year, ld.month))
-        covered = _nearest(t_prev, t_next, ld)
-        return _to_dt(occ(*next_month(covered.year, covered.month)))
+    else:
+        return now
 
-    elif unit == 'yearly':
-        # val = MMDD int (e.g. 315 = March 15, 1225 = December 25)
-        target_month = val // 100
-        target_day = val % 100
-
-        def occ(y):
-            return date(y, target_month,
-                        min(target_day, calendar.monthrange(y, target_month)[1]))
-
-        if not last:
-            candidate = occ(now.year)
-            if candidate < now.date():
-                candidate = occ(now.year + 1)
-            return _to_dt(candidate)
-        ld = last.date()
-        t = occ(ld.year)
-        if t >= ld:
-            t_prev, t_next = occ(ld.year - 1), t
-        else:
-            t_prev, t_next = t, occ(ld.year + 1)
-        covered = _nearest(t_prev, t_next, ld)
-        return _to_dt(occ(covered.year + 1))
-
-    return now
+    if not last:
+        return _to_dt(occ_on_or_after(now.date()))
+    # Credit the completion to whichever occurrence it's nearest (ties go to
+    # the earlier one), then the task is due at the occurrence after that.
+    ld = last.date()
+    t_prev, t_next = occ_before(ld), occ_on_or_after(ld)
+    covered = t_prev if (ld - t_prev) <= (t_next - ld) else t_next
+    return _to_dt(occ_on_or_after(covered + timedelta(days=1)))
 
 
-def get_all_tasks():
+def get_all_tasks(archived=False):
+    """Active tasks by default; archived=True for archived only, None for all."""
     conn = get_db()
     conn.execute("PRAGMA foreign_keys = ON")
-    rows = conn.execute('SELECT * FROM recurring_tasks').fetchall()
+    where = {False: ' WHERE archived_at IS NULL',
+             True: ' WHERE archived_at IS NOT NULL', None: ''}[archived]
+    rows = conn.execute('SELECT * FROM recurring_tasks' + where).fetchall()
     completions_by_task = get_completions_by_task(conn)
 
     now = datetime.now()
@@ -398,6 +475,7 @@ def get_all_tasks():
         task = dict(row)
         task['sensor_enabled'] = bool(task.get('sensor_enabled'))
         task['qr_enabled'] = bool(task.get('qr_enabled'))
+        task['fixed_set'] = parse_fixed_set(task.get('fixed_set'))
         stype = task.get('schedule_type') or 'interval'
         task['completions'] = completions_by_task.get(task['id'], [])
 
@@ -445,10 +523,9 @@ def get_all_tasks():
             task['is_overdue'] = delta.days < 0
         else:
             # Interval logic
-            freq = timedelta(days=task['frequency_days'])
             last = _parse_ts(task['last_completed'])
             if last:
-                next_due = last + freq
+                next_due = _add_interval(last, task['frequency_days'])
             else:
                 next_due = _parse_ts(task['created_at']) or now
             delta = next_due - now

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/style.css?v=2.11.2">
+    <link rel="stylesheet" href="static/style.css?v=2.12.0">
 </head>
 <body>
     <script>const BASE_PATH = "{{ ingress_path }}";</script>
@@ -37,52 +37,19 @@
                     <option value="365">years</option>
                 </select>
             </div>
-            <div id="fixed-fields" class="freq-group" style="display:none;">
-                <select id="fixed-unit">
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                </select>
-                <select id="fixed-dow">
-                    <option value="0">Monday</option>
-                    <option value="1">Tuesday</option>
-                    <option value="2">Wednesday</option>
-                    <option value="3">Thursday</option>
-                    <option value="4">Friday</option>
-                    <option value="5">Saturday</option>
-                    <option value="6">Sunday</option>
-                </select>
-                <input type="number" inputmode="numeric" id="fixed-dom" placeholder="Day" min="1" max="31" style="display:none;">
-                <div id="fixed-yearly-inputs" style="display:none;">
-                    <select id="fixed-month">
-                        <option value="1">Jan</option>
-                        <option value="2">Feb</option>
-                        <option value="3">Mar</option>
-                        <option value="4">Apr</option>
-                        <option value="5">May</option>
-                        <option value="6">Jun</option>
-                        <option value="7">Jul</option>
-                        <option value="8">Aug</option>
-                        <option value="9">Sep</option>
-                        <option value="10">Oct</option>
-                        <option value="11">Nov</option>
-                        <option value="12">Dec</option>
-                    </select>
-                    <input type="number" inputmode="numeric" id="fixed-year-day" placeholder="Day" min="1" max="31">
-                </div>
-            </div>
+            <div id="fixed-fields" class="freq-group" style="display:none;"></div>
             <textarea id="task-notes" placeholder="Notes (optional)" rows="2" style="display:none;"></textarea>
         </form>
         <div id="task-list" class="task-list"></div>
         <div class="data-tools">
-            <span class="version-label">v2.11.2</span>
+            <span class="version-label">v2.12.0</span>
             <a id="btn-qr-sheet" class="data-btn" href="qr-sheet" target="_blank" rel="noopener" title="Open a printable sheet of all tasks with QR enabled">Print QR sheet</a>
             <button id="btn-export" class="data-btn">Export</button>
             <button id="btn-import" class="data-btn">Import</button>
             <input type="file" id="import-file" accept=".json" style="display:none;">
         </div>
     </div>
-    <script src="static/vendor/qrcode.min.js?v=2.11.2"></script>
-    <script src="static/app.js?v=2.11.2"></script>
+    <script src="static/vendor/qrcode.min.js?v=2.12.0"></script>
+    <script src="static/app.js?v=2.12.0"></script>
 </body>
 </html>
