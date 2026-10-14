@@ -1008,6 +1008,7 @@ async function loadTasks(highlightId) {
     // Re-apply any active filter after re-render, then restore scroll
     applyTaskFilter();
     if (!highlightId) taskList.scrollTop = prevScroll;
+    return tasks;
 }
 
 function showLoadError(err) {
@@ -1158,7 +1159,109 @@ async function undoLastCompletion(completionId) {
 
 async function completeTask(id) {
     await fetch(`${BASE}/api/tasks/${id}/complete`, { method: 'POST' });
-    loadTasks(id);
+    const tasks = await loadTasks(id);
+    const task = tasks && tasks.find(t => t.id === id);
+    if (task && task.completions && task.completions.length) {
+        showResetToast(task, task.completions[0]);
+    }
+}
+
+// --- "Done today" toast: a few seconds to move the completion to an earlier day ---
+
+const TOAST_MS = 5000;
+let resetToast = null;
+
+function localDateStr(daysAgo = 0) {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function hideResetToast() {
+    if (!resetToast) return;
+    const el = resetToast.el;
+    cancelAnimationFrame(resetToast.raf);
+    resetToast = null;
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+}
+
+function showResetToast(task, completion) {
+    hideResetToast();
+    const el = document.createElement('div');
+    el.className = 'reset-toast';
+    el.setAttribute('role', 'status');
+    el.innerHTML = `
+        <div class="reset-toast-msg">&#10003; <strong>${escapeHtml(task.name)}</strong> done today</div>
+        <div class="reset-toast-actions">
+            <button type="button" data-days="1">Yesterday</button>
+            <button type="button" data-days="2">2 days ago</button>
+            <button type="button" data-pick>Pick date&hellip;</button>
+            <button type="button" data-undo class="reset-toast-undo">Undo</button>
+        </div>
+        <div class="reset-toast-bar"></div>
+    `;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+
+    const bar = el.querySelector('.reset-toast-bar');
+    const state = { el, remaining: TOAST_MS, last: performance.now(), paused: false, raf: 0 };
+    resetToast = state;
+
+    // Countdown bar; touching or hovering the toast pauses it
+    function tick(now) {
+        if (resetToast !== state) return;
+        if (!state.paused) state.remaining -= now - state.last;
+        state.last = now;
+        bar.style.transform = `scaleX(${Math.max(0, state.remaining / TOAST_MS)})`;
+        if (state.remaining <= 0) { hideResetToast(); return; }
+        state.raf = requestAnimationFrame(tick);
+    }
+    state.raf = requestAnimationFrame(tick);
+    const pause = () => { state.paused = true; };
+    const resume = () => { if (!el.querySelector('input')) state.paused = false; };
+    el.addEventListener('pointerenter', pause);
+    el.addEventListener('pointerleave', resume);
+    el.addEventListener('touchstart', pause, { passive: true });
+
+    async function moveTo(dateStr) {
+        state.paused = true;
+        await fetch(`${BASE}/api/completions/${completion.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed_at: dateStr + 'T12:00:00' })
+        });
+        const label = new Date(dateStr + 'T12:00:00')
+            .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        el.querySelector('.reset-toast-msg').innerHTML =
+            `&#10003; <strong>${escapeHtml(task.name)}</strong> done ${escapeHtml(label)}`;
+        el.querySelector('.reset-toast-actions').remove();
+        loadTasks(task.id);
+        setTimeout(() => { if (resetToast === state) hideResetToast(); }, 1500);
+    }
+
+    el.querySelectorAll('[data-days]').forEach(btn => {
+        btn.addEventListener('click', () => moveTo(localDateStr(parseInt(btn.dataset.days))));
+    });
+
+    el.querySelector('[data-pick]').addEventListener('click', (ev) => {
+        state.paused = true;
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.className = 'date-correct';
+        input.max = localDateStr(0);
+        input.value = localDateStr(1);
+        ev.currentTarget.replaceWith(input);
+        input.addEventListener('change', () => { if (input.value) moveTo(input.value); });
+        openDatePicker(input);
+    });
+
+    el.querySelector('[data-undo]').addEventListener('click', async () => {
+        hideResetToast();
+        await fetch(`${BASE}/api/completions/${completion.id}`, { method: 'DELETE' });
+        loadTasks(task.id);
+    });
 }
 
 async function completeTaskAt(id, dateStr) {

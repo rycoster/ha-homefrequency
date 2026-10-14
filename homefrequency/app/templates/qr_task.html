@@ -33,6 +33,12 @@
             width: 100%;
             box-shadow: 0 10px 40px rgba(0,0,0,0.08);
         }
+        .brand-mark {
+            display: block;
+            height: 44px;
+            width: auto;
+            margin-bottom: 14px;
+        }
         h1 {
             font-family: "Bebas Neue", sans-serif;
             font-size: 36px;
@@ -208,6 +214,7 @@
         <div class="banner banner-err"><span class="mark">!</span>{{ error }}</div>
         <a class="footer-link" href="/">Open HomeFrequency</a>
     {% else %}
+        <img class="brand-mark" src="{{ url_for('static', filename='logo-mark.png') }}" alt="Home Frequency">
         <h1>{{ task.name }}</h1>
 
         {% set d = task.days_until %}

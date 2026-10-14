@@ -517,10 +517,12 @@ def get_all_tasks(archived=False):
 
         elif stype == 'fixed' and task.get('fixed_unit') and task.get('fixed_value') is not None:
             next_due = _next_fixed_due(task)
-            delta = next_due - now
+            # Fixed dates are whole days (due at midnight), so count calendar
+            # days -- a timedelta would read "overdue by 1 day" all due-day long
+            days = (next_due.date() - now.date()).days
             task['next_due'] = next_due.isoformat()
-            task['days_until'] = delta.days
-            task['is_overdue'] = delta.days < 0
+            task['days_until'] = days
+            task['is_overdue'] = days < 0
         else:
             # Interval logic
             last = _parse_ts(task['last_completed'])

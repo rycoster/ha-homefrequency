@@ -1656,3 +1656,73 @@ body.qr-modal-open { overflow: hidden; }
 .task-card.archived-card .task-actions button {
     flex: none;
 }
+
+/* "Done today" toast after Reset: move the completion to an earlier day */
+.reset-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 20px);
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    width: min(560px, calc(100vw - 32px));
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    padding: 10px 12px 12px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.reset-toast.show {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+
+.reset-toast-msg {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.reset-toast-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.reset-toast-actions button {
+    padding: 5px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--divider);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.reset-toast-actions .reset-toast-undo {
+    margin-left: auto;
+    color: var(--text-secondary);
+}
+
+.reset-toast-actions input[type="date"] {
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--primary);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+.reset-toast-bar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 100%;
+    background: var(--primary);
+    transform-origin: left;
+}
+

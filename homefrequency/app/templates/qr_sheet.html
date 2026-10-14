@@ -32,6 +32,9 @@
             font-weight: 600;
             color: #0e1525;
         }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand img { height: 36px; width: auto; display: block; }
+        .brand-name { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
         .header-actions { display: flex; gap: 10px; align-items: center; }
         .btn {
             padding: 8px 16px;
@@ -124,7 +127,13 @@
 </head>
 <body>
     <header>
-        <h1>Printable QR sheet</h1>
+        <div class="brand">
+            <img src="static/logo-mark.png" alt="">
+            <div>
+                <div class="brand-name">Home Frequency</div>
+                <h1>Printable QR sheet</h1>
+            </div>
+        </div>
         <div class="header-actions">
             <a class="btn btn-secondary" href="./">← Back</a>
             <button type="button" class="btn btn-primary" id="btn-print">Print</button>

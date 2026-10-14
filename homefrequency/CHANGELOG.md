@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.13.0
+- After **Reset**, a toast gives you 5 seconds to say when you actually did it: **Yesterday**, **2 days ago**, **Pick date…**, or **Undo**. Tapping one moves that completion to the chosen day. Touching the toast pauses the countdown; ignoring it keeps "done now"
+- QR scan landing page and printable QR sheet now show the clock-house logo
+- Fix: fixed-schedule tasks showed "Overdue by 1 day" all day on their due date (they're due at midnight). They now count calendar days, so the due day reads "Due today"
+
 ## 2.12.1
 - Add-on page logo is now a compact "H [clock-house] F" mark in sky blue, with the letters cut out of the house walls. The wide icon + wordmark logo was shown too small to read, and its navy text vanished on HA's dark theme
 
